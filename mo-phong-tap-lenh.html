@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tập lệnh Assembly cho người mới</title>
+<meta name="description" content="Học các lệnh Assembly 8086, xem trình biên dịch tự sinh mã từ phép gán và luyện bài tập trên máy ảo từng bước.">
+<meta name="theme-color" content="#ea580c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ea580c'/%3E%3Ctext x='16' y='21' font-size='11' font-weight='800' font-family='monospace' text-anchor='middle' fill='white'%3EMOV%3C/text%3E%3C/svg%3E">
 <style>
 :root{
   --bg1:#eef2fb; --bg2:#e4ebf8; --card:#ffffff; --card2:#f6f8fc; --line:#d7e0f0; --text:#0f1b33; --muted:#5c6b86;
@@ -31,12 +34,19 @@ button,select,input,textarea{font:inherit;color:inherit}
 code,.mono{font-family:var(--mono)}
 
 /* header */
-.top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 24px;background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
-.brand{display:flex;align-items:center;gap:12px}
-.logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#ea580c,#db2777);color:#fff;display:grid;place-items:center;font:800 17px var(--mono);box-shadow:0 4px 12px rgba(219,39,119,.35)}
-.brand h1{margin:0;font-size:19px;line-height:1.2}
-.brand p{margin:0;font-size:13px;color:var(--muted)}
-.top-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.top{display:flex;align-items:center;gap:10px 18px;padding:9px 24px;background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.brand{display:flex;align-items:center;gap:11px;min-width:0;color:inherit;text-decoration:none}
+.logo{flex:none;width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#ea580c,#db2777);color:#fff;display:grid;place-items:center;font:800 14px var(--mono);box-shadow:0 4px 12px rgba(219,39,119,.35)}
+.brand h1{margin:0;font-size:17px;line-height:1.2}
+.brand p{margin:0;font-size:12.5px;color:var(--muted)}
+.nav{display:flex;gap:4px;padding:3px;margin-left:auto;border-radius:13px;background:var(--card2);border:1px solid var(--line)}
+.nav a{padding:6px 14px;border-radius:10px;font-weight:700;font-size:13.5px;color:var(--muted);text-decoration:none;white-space:nowrap;transition:background .15s,color .15s}
+.nav a:hover{color:var(--text);background:var(--accent-soft)}
+.nav a[aria-current="page"]{background:var(--accent);color:#fff;box-shadow:0 3px 10px color-mix(in srgb,var(--accent) 40%,transparent)}
+:root[data-theme="dark"] .nav a[aria-current="page"]{color:#0a1120}
+.top-actions{display:flex;align-items:center;gap:8px}
+.btn.icon{padding:8px 11px;min-width:40px}
+.btn.icon svg{width:18px;height:18px;display:block}
 .btn,select{border:1px solid var(--line);background:var(--card2);border-radius:11px;padding:8px 13px;cursor:pointer}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:700;transition:background .15s,border-color .15s,transform .06s;text-decoration:none;color:var(--text)}
 .btn:hover:not(:disabled){border-color:var(--accent);background:var(--accent-soft)}
@@ -45,15 +55,18 @@ code,.mono{font-family:var(--mono)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 45%,transparent)}
 :root[data-theme="dark"] .btn.primary{color:#0a1120}
 .btn.small{padding:5px 10px;font-size:13px;border-radius:9px}
-.motion{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap}
-.motion input{width:17px;height:17px;accent-color:var(--accent)}
+.motion{position:relative;display:inline-flex;align-items:center;gap:7px;padding:8px 12px;border:1px solid var(--line);background:var(--card2);border-radius:11px;cursor:pointer;font-weight:700;font-size:13.5px;color:var(--muted);white-space:nowrap;user-select:none;transition:background .15s,border-color .15s}
+.motion input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.motion:has(input:checked){background:var(--accent-soft);border-color:var(--accent);color:var(--text)}
+.motion:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:2px}
 
 /* layout */
 .layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(430px,1fr);gap:18px;padding:18px 24px 44px;max-width:1760px;margin:0 auto;align-items:start}
 .main{min-width:0;display:flex;flex-direction:column;gap:14px}
 .side{min-width:0}
-@media (min-width:1101px){.side{position:sticky;top:76px;max-height:calc(100vh - 92px);overflow:auto;padding:2px 4px 2px 2px}}
-@media (max-width:1100px){.layout{grid-template-columns:minmax(0,1fr);padding:14px}.top{padding:10px 14px}}
+@media (min-width:1101px){.side{position:sticky;top:70px;max-height:calc(100vh - 84px);overflow:auto;padding:2px 4px 2px 2px}}
+@media (max-width:1280px){.brand p{display:none}}
+@media (max-width:1100px){.layout{grid-template-columns:minmax(0,1fr);padding:12px 12px 84px}}
 
 /* tabs */
 .tabbar{display:flex;gap:8px;flex-wrap:wrap}
@@ -240,24 +253,51 @@ textarea.asm{min-height:200px;font-size:13.5px;line-height:1.6}
 .endmsg.err{background:color-mix(in srgb,var(--bad) 13%,var(--card));border:1px solid var(--bad)}
 .endmsg.done{background:color-mix(in srgb,var(--ok) 13%,var(--card));border:1px solid var(--ok)}
 .endmsg[hidden]{display:none}
+
+/* nút nhảy nhanh giữa bài học và máy ảo (chỉ khi một cột) */
+.jump{display:none}
+@media (max-width:1100px){
+  .jump{display:inline-flex;align-items:center;position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:30;padding:12px 18px;border-radius:999px;border:none;background:var(--accent);color:#fff;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 8px 24px color-mix(in srgb,var(--accent) 50%,transparent)}
+  :root[data-theme="dark"] .jump{color:#0a1120}
+  .top{padding:8px 12px;flex-wrap:wrap;position:static}
+  .brand{flex:1 1 0}
+  .nav{order:3;width:100%;margin:0}
+  .nav a{flex:1;text-align:center;padding:9px 8px}
+  .motion .lbl{display:none}
+}
+@media (max-width:700px){
+  .brand h1{font-size:15.5px}
+  .tabbar{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .tabbar button{min-width:0;padding:10px 9px;font-size:13px;line-height:1.3} .tabbar button small{display:none}
+  .sec{padding:15px 14px}
+  .cl{gap:8px} .cl .cc{flex-basis:128px}
+  .axhalves{flex-wrap:wrap} .half{min-width:0;flex:1 1 140px}
+  .answer input{width:100%} .answer .btn{flex:1 1 auto}
+}
+.regs{grid-template-columns:repeat(2,minmax(0,1fr))} .reg,.byte{min-width:0} .bytes{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:480px){ .rctl{grid-template-columns:repeat(2,1fr)} .rctl .btn{padding:12px 6px} .regs{grid-template-columns:minmax(0,1fr)} }
 </style>
 </head>
 <body>
 
 <header class="top">
-  <div class="brand">
+  <a class="brand" href="mo-phong-tap-lenh.html">
     <div class="logo" aria-hidden="true">MOV</div>
     <div>
       <h1>Tập lệnh Assembly cho người mới</h1>
       <p>Học các lệnh, xem trình biên dịch tự sinh mã, rồi luyện bài tập</p>
     </div>
-  </div>
+  </a>
+  <nav class="nav" aria-label="Chuyển trang">
+    <a href="mo-phong-cpu.html" title="Xem CPU nạp, giải mã và thực thi từng lệnh">⚙ Mô phỏng CPU</a>
+    <a href="mo-phong-tap-lenh.html" aria-current="page">📘 Tập lệnh &amp; bài tập</a>
+  </nav>
   <div class="top-actions">
-    <a class="btn" href="mo-phong-cpu.html" title="Xem CPU nạp, giải mã và thực thi từng lệnh">⚙ Xem CPU chạy lệnh</a>
-    <label class="motion"><input type="checkbox" id="motion" checked> Hiệu ứng chuyển động</label>
-    <button class="btn" id="btnTheme" type="button">Sáng / Tối</button>
+    <label class="motion" title="Tắt nếu máy chậm hoặc bạn không muốn hiệu ứng chuyển động"><input type="checkbox" id="motion" checked><span aria-hidden="true">✦</span><span class="lbl">Chuyển động</span></label>
+    <button class="btn icon" id="btnTheme" type="button" aria-label="Đổi giao diện sáng hoặc tối" title="Đổi giao diện sáng / tối"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg></button>
   </div>
 </header>
+<button class="jump" id="jump" type="button" hidden></button>
 
 <main class="layout">
   <div class="main">
@@ -1141,6 +1181,16 @@ function init() {
   $('#rApply').onclick = () => { if (loadRunner($('#rTxt').value, 'Mã do bạn nhập')) { $('#rEdit').hidden = true; } };
   loadRunner(GROUPS[0].rows[0].ex, 'Ví dụ: ' + GROUPS[0].rows[0].syn);
   $('#cSrc').value = 'a = b + c';
+  // nút nổi nhảy giữa bài học và máy ảo khi màn hình một cột
+  const jump = $('#jump'), narrow = matchMedia('(max-width:1100px)');
+  const syncJump = () => {
+    jump.hidden = !narrow.matches; if (!narrow.matches) return;
+    const atMachine = $('.side').getBoundingClientRect().top < innerHeight * 0.6;
+    jump.dataset.to = atMachine ? 'lesson' : 'machine';
+    jump.textContent = atMachine ? '⬆ Về bài học' : '⬇ Máy ảo';
+  };
+  jump.onclick = () => (jump.dataset.to === 'machine' ? $('.side') : $('.main')).scrollIntoView({behavior: calm ? 'auto' : 'smooth', block: 'start'});
+  addEventListener('scroll', syncJump, {passive: true}); addEventListener('resize', syncJump); syncJump();
 }
 // API nhỏ phục vụ kiểm thử
 window.__t = {assemble, runAll, compile, TEMPLATES, expectedOf, GROUPS, newState, exec};

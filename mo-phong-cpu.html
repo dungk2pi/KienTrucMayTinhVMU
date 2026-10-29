@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mô phỏng CPU chạy lệnh</title>
+<meta name="description" content="Mô phỏng từng bước CPU nạp, giải mã và thực thi lệnh hợp ngữ: thanh ghi, ALU, bus và giản đồ xung nhịp.">
+<meta name="theme-color" content="#4f46e5">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='white'%3E%E2%9A%99%3C/text%3E%3C/svg%3E">
 <style>
 :root{
   --bg1:#eef2fb; --bg2:#e4ebf8; --card:#ffffff; --card2:#f6f8fc; --line:#d7e0f0; --text:#0f1b33; --muted:#5c6b86;
@@ -31,13 +34,23 @@ button,select,input,textarea{font:inherit;color:inherit}
 :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 
 /* ---------- header ---------- */
-.top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 24px;background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
-.brand{display:flex;align-items:center;gap:12px}
-.logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#4f46e5,#2563eb);color:#fff;display:grid;place-items:center;font-size:23px;box-shadow:0 4px 12px rgba(79,70,229,.4)}
-.brand h1{margin:0;font-size:19px;line-height:1.2}
-.brand p{margin:0;font-size:13px;color:var(--muted)}
-.top-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.top-actions label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.top{display:flex;align-items:center;gap:10px 18px;padding:9px 24px;background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.brand{display:flex;align-items:center;gap:11px;min-width:0;color:inherit;text-decoration:none}
+.logo{flex:none;width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#4f46e5,#2563eb);color:#fff;display:grid;place-items:center;font-size:21px;box-shadow:0 4px 12px rgba(79,70,229,.4)}
+.brand h1{margin:0;font-size:17px;line-height:1.2}
+.brand p{margin:0;font-size:12.5px;color:var(--muted)}
+.nav{display:flex;gap:4px;padding:3px;margin-left:auto;border-radius:13px;background:var(--card2);border:1px solid var(--line)}
+.nav a{padding:6px 14px;border-radius:10px;font-weight:700;font-size:13.5px;color:var(--muted);text-decoration:none;white-space:nowrap;transition:background .15s,color .15s}
+.nav a:hover{color:var(--text);background:var(--accent-soft)}
+.nav a[aria-current="page"]{background:var(--accent);color:#fff;box-shadow:0 3px 10px color-mix(in srgb,var(--accent) 40%,transparent)}
+:root[data-theme="dark"] .nav a[aria-current="page"]{color:#0a1120}
+.top-actions{display:flex;align-items:center;gap:8px}
+.btn.icon{padding:8px 11px;min-width:40px}
+.btn.icon svg{width:18px;height:18px;display:block}
+.motion{position:relative;display:inline-flex;align-items:center;gap:7px;padding:8px 12px;border:1px solid var(--line);background:var(--card2);border-radius:11px;cursor:pointer;font-weight:700;font-size:13.5px;color:var(--muted);white-space:nowrap;user-select:none;transition:background .15s,border-color .15s}
+.motion input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.motion:has(input:checked){background:var(--accent-soft);border-color:var(--accent);color:var(--text)}
+.motion:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:2px}
 select,.btn{border:1px solid var(--line);background:var(--card2);border-radius:11px;padding:8px 13px;cursor:pointer}
 select{max-width:300px;font-weight:600}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:700;transition:background .15s,border-color .15s,transform .06s,box-shadow .15s}
@@ -52,8 +65,12 @@ select{max-width:300px;font-weight:600}
 .layout{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(400px,1fr);gap:18px;padding:18px 24px 44px;max-width:1760px;margin:0 auto;align-items:start}
 .stage{display:flex;flex-direction:column;gap:14px;min-width:0}
 .side{display:flex;flex-direction:column;gap:14px;min-width:0}
-@media (min-width:1051px){.side{position:sticky;top:76px;max-height:calc(100vh - 92px);overflow:auto;padding:2px 4px 2px 2px}}
-@media (max-width:1050px){.layout{grid-template-columns:minmax(0,1fr);padding:14px 14px 32px}.top{padding:10px 14px}}
+@media (min-width:1051px){.side{position:sticky;top:70px;max-height:calc(100vh - 84px);overflow:auto;padding:2px 4px 2px 2px}}
+@media (max-width:1280px){.brand p{display:none}}
+.preset-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;font-size:13px;font-weight:700;color:var(--muted)}
+.preset-row select{flex:1;min-width:0;max-width:none}
+.dscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.swipe-hint{display:none;margin:2px 6px 6px;font-size:12px;color:var(--muted)}
 
 /* ---------- phase + chips ---------- */
 .cyc{padding:12px 14px;display:flex;flex-direction:column;gap:10px}
@@ -291,28 +308,50 @@ dialog::backdrop{background:rgba(8,15,30,.6);backdrop-filter:blur(3px)}
 .three b{display:block;font-size:14.5px;margin-bottom:2px}
 @media (max-width:640px){.three{grid-template-columns:1fr}}
 .calm .bus.active,.calm .box.active .gear,.calm .ptr-mar rect,.calm .chip.next{animation:none}.calm .pop,.calm .box.flash .bg{animation:none}.calm .w-clk.draw{animation:none;stroke-dashoffset:0}.calm .w-bar.new{animation:none}.calm .ptr{transition:none}
-.motion{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap}
-.motion input{width:17px;height:17px;accent-color:var(--accent)}
+/* máy tính bảng + điện thoại: một cột, thanh Lùi/Chạy/Tiếp luôn dính đáy màn hình */
+@media (max-width:1050px){
+  .layout{display:flex;flex-direction:column;align-items:stretch;gap:12px;padding:12px 12px calc(100px + env(safe-area-inset-bottom))}
+  .layout .card,#predictBox{min-width:0}
+  .stage,.side{display:contents}
+  .cyc{order:1} .diagram{order:2} #predictBox{order:3} .stepcard{order:4} .controls{order:5} .wave{order:6} .prog{order:7} .tabs{order:8}
+  #predictBox:empty{display:none}
+  .ctl-main{position:fixed;left:0;right:0;bottom:0;z-index:30;padding:10px max(12px,calc((100% - 720px)/2)) calc(10px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--card) 94%,transparent);backdrop-filter:blur(10px);border-top:1px solid var(--line);box-shadow:0 -8px 24px rgba(15,27,51,.14)}
+  .ctl-main .btn{padding:13px 14px}
+  .hint{display:none}
+  .top{padding:8px 12px;flex-wrap:wrap;position:static}
+  .brand{flex:1 1 0}
+  .nav{order:3;width:100%;margin:0}
+  .nav a{flex:1;text-align:center;padding:9px 8px}
+  .motion .lbl,.btn.icon .lbl{display:none}
+}
+@media (max-width:760px){
+  #svg{min-width:680px}
+  .swipe-hint{display:block}
+  .phase{padding:8px 9px} .phase b{font-size:13px} .phase span{display:none}
+  .brand h1{font-size:15.5px}
+  .dlg{padding:18px 16px 16px}
+  .stepcard{padding:14px 15px} .rtl{font-size:20px}
+}
 </style>
 </head>
 <body>
 
 <header class="top">
-  <div class="brand">
+  <a class="brand" href="mo-phong-cpu.html">
     <div class="logo" aria-hidden="true">⚙</div>
     <div>
       <h1>CPU chạy một lệnh như thế nào?</h1>
-      <p>Mô phỏng chu kỳ Nạp – Giải mã – Thực thi với hợp ngữ MOV, ADD, CMP, JMP…</p>
+      <p>Chu kỳ Nạp – Giải mã – Thực thi với hợp ngữ MOV, ADD, CMP, JMP…</p>
     </div>
-  </div>
+  </a>
+  <nav class="nav" aria-label="Chuyển trang">
+    <a href="mo-phong-cpu.html" aria-current="page">⚙ Mô phỏng CPU</a>
+    <a href="mo-phong-tap-lenh.html" title="Học các lệnh Assembly và luyện bài tập">📘 Tập lệnh &amp; bài tập</a>
+  </nav>
   <div class="top-actions">
-    <label>Chương trình
-      <select id="preset" aria-label="Chọn chương trình mẫu"></select>
-    </label>
-    <a class="btn" href="mo-phong-tap-lenh.html" style="text-decoration:none;color:var(--text)" title="Học các lệnh Assembly và luyện bài tập">MOV Tập lệnh &amp; bài tập</a>
-    <label class="motion" title="Tắt nếu máy chậm hoặc bạn không muốn hiệu ứng chuyển động"><input type="checkbox" id="motion" checked> Hiệu ứng chuyển động</label>
-    <button class="btn" id="btnHelp" type="button">Hướng dẫn</button>
-    <button class="btn" id="btnTheme" type="button" aria-label="Đổi giao diện sáng hoặc tối">Sáng / Tối</button>
+    <label class="motion" title="Tắt nếu máy chậm hoặc bạn không muốn hiệu ứng chuyển động"><input type="checkbox" id="motion" checked><span aria-hidden="true">✦</span><span class="lbl">Chuyển động</span></label>
+    <button class="btn icon" id="btnHelp" type="button" aria-label="Hướng dẫn sử dụng" title="Hướng dẫn sử dụng"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9.2 9.3a2.9 2.9 0 1 1 4.2 2.6c-.9.5-1.4 1-1.4 2"/><circle cx="12" cy="17.2" r=".6" fill="currentColor"/></svg></button>
+    <button class="btn icon" id="btnTheme" type="button" aria-label="Đổi giao diện sáng hoặc tối" title="Đổi giao diện sáng / tối"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg></button>
   </div>
 </header>
 
@@ -329,7 +368,8 @@ dialog::backdrop{background:rgba(8,15,30,.6);backdrop-filter:blur(3px)}
     </div>
 
     <div class="card diagram">
-      <svg id="svg" viewBox="0 0 1030 790" role="img" aria-label="Sơ đồ khối CPU gồm PC, MAR, MBR, IR, CU, thanh ghi AX BX CX DX, ALU, cờ FLAGS, bus trong, ba bus ngoài và bộ nhớ RAM"></svg>
+      <p class="swipe-hint">↔ Vuốt ngang để xem toàn bộ sơ đồ</p>
+      <div class="dscroll"><svg id="svg" viewBox="0 0 1030 790" role="img" aria-label="Sơ đồ khối CPU gồm PC, MAR, MBR, IR, CU, thanh ghi AX BX CX DX, ALU, cờ FLAGS, bus trong, ba bus ngoài và bộ nhớ RAM"></svg></div>
       <div class="legend">
         <span><i style="background:var(--c-fetch)"></i>Thanh ghi lấy lệnh</span>
         <span><i style="background:var(--c-gen)"></i>Thanh ghi dữ liệu</span>
@@ -353,6 +393,9 @@ dialog::backdrop{background:rgba(8,15,30,.6);backdrop-filter:blur(3px)}
 
   <aside class="side">
     <div class="card controls">
+      <label class="preset-row">Chương trình
+        <select id="preset" aria-label="Chọn chương trình mẫu"></select>
+      </label>
       <div class="ctl-main">
         <button class="btn" id="bPrev" type="button" title="Phím ←">◀ Lùi</button>
         <button class="btn primary" id="bPlay" type="button" title="Phím cách">▶ Tự chạy</button>
