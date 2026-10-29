@@ -1,0 +1,1412 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mô phỏng CPU chạy lệnh</title>
+<style>
+:root{
+  --bg1:#eef2fb; --bg2:#e4ebf8; --card:#ffffff; --card2:#f6f8fc; --line:#d7e0f0; --text:#0f1b33; --muted:#5c6b86;
+  --accent:#4f46e5; --accent-soft:#e3e1ff; --flash:#fde68a;
+  --a:#8b5cf6; --d:#e11d48; --c:#0d9488;
+  --c-fetch:#2563eb; --c-gen:#16a34a; --c-alu:#ea580c; --c-cu:#4f46e5; --c-flag:#d97706; --c-ram:#475569;
+  --ph-f:#2563eb; --ph-d:#d97706; --ph-e:#16a34a; --ok:#16a34a; --bad:#dc2626;
+  --code-bg:#f1f5fb; --shadow:0 1px 2px rgba(15,27,51,.06),0 8px 24px rgba(15,27,51,.07);
+  --mono:"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+  --sans:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+}
+:root[data-theme="dark"]{
+  --bg1:#0a1120; --bg2:#0e1830; --card:#121c33; --card2:#17233f; --line:#2b3b60; --text:#e8eefb; --muted:#9db0d3;
+  --accent:#8b8cff; --accent-soft:#272a66; --flash:#7a5a14;
+  --a:#a78bfa; --d:#fb7185; --c:#2dd4bf;
+  --c-fetch:#60a5fa; --c-gen:#4ade80; --c-alu:#fb923c; --c-cu:#a5a6ff; --c-flag:#fbbf24; --c-ram:#94a3b8;
+  --ph-f:#60a5fa; --ph-d:#fbbf24; --ph-e:#4ade80; --ok:#4ade80; --bad:#f87171;
+  --code-bg:#0c1529; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:linear-gradient(180deg,var(--bg1),var(--bg2)) fixed;color:var(--text);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased;min-height:100vh}
+button,select,input,textarea{font:inherit;color:inherit}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* ---------- header ---------- */
+.top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 24px;background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#4f46e5,#2563eb);color:#fff;display:grid;place-items:center;font-size:23px;box-shadow:0 4px 12px rgba(79,70,229,.4)}
+.brand h1{margin:0;font-size:19px;line-height:1.2}
+.brand p{margin:0;font-size:13px;color:var(--muted)}
+.top-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.top-actions label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+select,.btn{border:1px solid var(--line);background:var(--card2);border-radius:11px;padding:8px 13px;cursor:pointer}
+select{max-width:300px;font-weight:600}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:700;transition:background .15s,border-color .15s,transform .06s,box-shadow .15s}
+.btn:hover:not(:disabled){border-color:var(--accent);background:var(--accent-soft)}
+.btn:active:not(:disabled){transform:translateY(1px)}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 45%,transparent)}
+.btn.primary:hover:not(:disabled){background:var(--accent);filter:brightness(1.1)}
+:root[data-theme="dark"] .btn.primary{color:#0a1120}
+
+/* ---------- layout ---------- */
+.layout{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(400px,1fr);gap:18px;padding:18px 24px 44px;max-width:1760px;margin:0 auto;align-items:start}
+.stage{display:flex;flex-direction:column;gap:14px;min-width:0}
+.side{display:flex;flex-direction:column;gap:14px;min-width:0}
+@media (min-width:1051px){.side{position:sticky;top:76px;max-height:calc(100vh - 92px);overflow:auto;padding:2px 4px 2px 2px}}
+@media (max-width:1050px){.layout{grid-template-columns:minmax(0,1fr);padding:14px 14px 32px}.top{padding:10px 14px}}
+
+/* ---------- phase + chips ---------- */
+.cyc{padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.phasebar{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.phase{padding:9px 14px;border-radius:13px;border:2px solid var(--line);background:var(--card2);display:flex;flex-direction:column;transition:all .3s;opacity:.65}
+.phase b{font-size:15px}
+.phase span{font-size:12.5px;color:var(--muted)}
+.phase.on{opacity:1;color:#fff;border-color:transparent;transform:translateY(-1px)}
+.phase.on span{color:rgba(255,255,255,.9)}
+.phase[data-p="F"].on{background:var(--ph-f);box-shadow:0 6px 18px color-mix(in srgb,var(--ph-f) 45%,transparent)}
+.phase[data-p="D"].on{background:var(--ph-d);box-shadow:0 6px 18px color-mix(in srgb,var(--ph-d) 45%,transparent)}
+.phase[data-p="E"].on{background:var(--ph-e);box-shadow:0 6px 18px color-mix(in srgb,var(--ph-e) 45%,transparent)}
+.phase.on[data-p="D"] b,.phase.on[data-p="D"] span{color:#2a1a00}
+:root[data-theme="dark"] .phase.on b,:root[data-theme="dark"] .phase.on span{color:#07101f}
+#chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{padding:4px 10px;border-radius:999px;border:1.5px solid var(--line);background:var(--card2);font:700 12.5px var(--mono);display:inline-flex;gap:6px;align-items:center;transition:all .25s}
+.chip small{font:700 10.5px var(--sans);color:var(--muted)}
+.chip.done{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip.done small{color:rgba(255,255,255,.85)}
+.chip.next{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft);animation:beat 1.1s ease-in-out infinite}
+.chip.sep{border:none;background:none;padding:0 2px;color:var(--muted)}
+:root[data-theme="dark"] .chip.done{color:#0a1120}
+:root[data-theme="dark"] .chip.done small{color:#1a1d55}
+@keyframes beat{50%{box-shadow:0 0 0 7px transparent}}
+.insline{font-size:13.5px;color:var(--muted)}
+.insline b{color:var(--text);font-family:var(--mono);font-size:14.5px}
+
+/* ---------- diagram ---------- */
+.diagram{padding:8px 8px 4px}
+#svg{width:100%;height:auto;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;padding:2px 12px 10px;font-size:12.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:14px;height:14px;border-radius:5px}
+.legend i.l{width:22px;height:6px;border-radius:3px}
+
+.cpu-frame{fill:color-mix(in srgb,var(--card2) 55%,transparent);stroke:var(--line);stroke-width:2;stroke-dasharray:7 7}
+.cpu-label{font:800 15px var(--sans);fill:var(--muted);letter-spacing:.2em}
+.ibus{fill:color-mix(in srgb,var(--muted) 35%,transparent)}
+.ibus-t{font:700 11.5px var(--sans);fill:var(--muted);letter-spacing:.06em}
+.stub{stroke:color-mix(in srgb,var(--muted) 50%,transparent);stroke-width:4;stroke-linecap:round;fill:none}
+.stub.thin{stroke-width:3}
+.box{--cat:var(--c-fetch);transition:opacity .3s}
+.cat-fetch{--cat:var(--c-fetch)} .cat-gen{--cat:var(--c-gen)} .cat-alu{--cat:var(--c-alu)} .cat-cu{--cat:var(--c-cu)} .cat-flag{--cat:var(--c-flag)}
+.box .bg{fill:var(--card);stroke:color-mix(in srgb,var(--cat) 35%,var(--line));stroke-width:2;transition:stroke .25s,fill .25s,filter .25s}
+.box .pill{fill:var(--cat)}
+.box .pill-t{font:800 13px var(--sans);fill:#fff;text-anchor:middle}
+:root[data-theme="dark"] .box .pill-t{fill:#07101f}
+.box .s{font:12px var(--sans);fill:var(--muted)}
+.box .v{font:800 27px var(--mono);fill:var(--text)}
+.box .h{font:12.5px var(--mono);fill:var(--muted)}
+.box .lbl{font:11.5px var(--sans);fill:var(--muted)}
+.box .fv{font:800 16px var(--mono);fill:var(--text)}
+.box .cell{fill:var(--card2);stroke:var(--line);stroke-width:1.5;transition:all .25s}
+.box.active .bg{stroke:var(--cat);stroke-width:4;fill:color-mix(in srgb,var(--cat) 9%,var(--card));filter:drop-shadow(0 0 9px color-mix(in srgb,var(--cat) 65%,transparent))}
+.box.active .cell.on{fill:color-mix(in srgb,var(--cat) 22%,var(--card));stroke:var(--cat)}
+.focus .box:not(.active){opacity:.5}
+.focus #ram:not(.active){opacity:.72}
+.pop{animation:pop .75s cubic-bezier(.2,.9,.3,1.3)}
+@keyframes pop{0%{transform:scale(1.5);fill:var(--cat,var(--accent))}60%{transform:scale(.96)}100%{transform:scale(1)}}
+.v,.fv{transform-box:fill-box;transform-origin:left center}
+.gear{font:800 30px var(--sans);fill:var(--c-cu);transform-box:fill-box;transform-origin:center}
+.box.active .gear{animation:spin 1.6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.lamp{fill:var(--card2);stroke:var(--line);stroke-width:2;transition:all .3s}
+.lamp.on{fill:var(--c-flag);stroke:var(--c-flag);filter:drop-shadow(0 0 7px var(--c-flag))}
+.lamp-t{font:800 13px var(--mono);fill:var(--muted);text-anchor:middle}
+.lamp.on + .lamp-t{fill:#fff}
+.alu-shape{fill:var(--card);stroke:color-mix(in srgb,var(--c-alu) 40%,var(--line));stroke-width:2;transition:all .25s}
+.box.active .alu-shape{stroke:var(--c-alu);stroke-width:4;fill:color-mix(in srgb,var(--c-alu) 9%,var(--card));filter:drop-shadow(0 0 9px color-mix(in srgb,var(--c-alu) 65%,transparent))}
+.alu-x{font:800 21px var(--mono);fill:var(--text);text-anchor:middle}
+.alu-r{font:800 21px var(--mono);fill:var(--c-alu);text-anchor:middle}
+
+.bus{fill:none;stroke-width:9;stroke-linecap:round;opacity:.4;transition:opacity .25s}
+.bus.a{stroke:var(--a)} .bus.d{stroke:var(--d)} .bus.c{stroke:var(--c)}
+.bus.active{opacity:1;stroke-dasharray:16 10;animation:flow .6s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-26}}
+.buslbl{font:800 13px var(--sans);letter-spacing:.04em;text-anchor:middle}
+.buslbl.a{fill:var(--a)} .buslbl.d{fill:var(--d)} .buslbl.c{fill:var(--c)}
+.busnote{font:11.5px var(--sans);fill:var(--muted);text-anchor:middle}
+.route{fill:none;stroke-width:6;stroke-linecap:round;stroke-linejoin:round;opacity:.5}
+.packet rect{stroke:#fff;stroke-width:2;filter:drop-shadow(0 3px 5px rgba(0,0,0,.35))}
+.packet text{font:800 14px var(--mono);fill:#fff;text-anchor:middle}
+.ring{fill:none;stroke-width:4}
+.floatT{font:800 22px var(--mono);text-anchor:middle;paint-order:stroke;stroke:var(--card);stroke-width:5px}
+.clk-led{fill:var(--card2);stroke:var(--line);stroke-width:2}
+.clk-led.on{fill:#22c55e;stroke:#22c55e;filter:drop-shadow(0 0 8px #22c55e)}
+.clk-t{font:800 13px var(--sans);fill:var(--muted)}
+.clk-n{font:700 13px var(--mono);fill:var(--text)}
+
+.ram-bg{fill:var(--card);stroke:var(--line);stroke-width:2}
+.ramtitle{font:800 15px var(--sans);fill:var(--text)}
+.ramsub{font:11.5px var(--sans);fill:var(--muted)}
+.row rect{fill:var(--card2);stroke:var(--line);stroke-width:1;transition:all .25s}
+.row.c rect{fill:color-mix(in srgb,var(--c-fetch) 10%,var(--card))}
+.row.d rect{fill:color-mix(in srgb,var(--c-gen) 11%,var(--card))}
+.row.read rect{fill:var(--accent-soft);stroke:var(--accent);stroke-width:2.5}
+.row.write rect{fill:var(--flash);stroke:var(--d);stroke-width:2.5}
+.row .ad{font:12px var(--mono);fill:var(--muted)}
+.row .tx{font:800 14px var(--mono);fill:var(--text)}
+.row .tg{font:700 9.5px var(--sans);fill:var(--muted);letter-spacing:.05em;text-anchor:end}
+.ptr{transition:transform .55s cubic-bezier(.3,.8,.25,1)}
+.ptr-pc rect{fill:var(--accent)} .ptr-pc text{font:800 12px var(--sans);fill:#fff;text-anchor:middle}
+:root[data-theme="dark"] .ptr-pc text{fill:#07101f}
+.ptr-mar rect{fill:none;stroke:var(--a);stroke-width:3;stroke-dasharray:6 4;animation:dash 1s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-20}}
+.ptr-mar text{font:800 10.5px var(--sans);fill:var(--a);text-anchor:end}
+
+/* ---------- timing diagram ---------- */
+.wave{padding:12px 14px 10px}
+.wave-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.wave-head b{font-size:15px}
+.wave-body{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card2)}
+.wave-lab{flex:0 0 96px;border-right:1px solid var(--line);background:var(--card)}
+.wave-scroll{overflow-x:auto;flex:1;scroll-behavior:smooth}
+.wave svg{display:block}
+.wave-lab svg text{font:700 12px var(--sans);fill:var(--muted)}
+.w-clk{fill:none;stroke:var(--text);stroke-width:2.5;stroke-linejoin:round}
+.w-clk.draw{stroke-dasharray:200;stroke-dashoffset:200;animation:draw .7s ease-out forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.w-bar{opacity:.92;transform-box:fill-box;transform-origin:center}
+.w-bar.new{animation:grow .5s ease-out}
+@keyframes grow{from{transform:scaleX(.1);opacity:0}}
+.w-t{font:800 11.5px var(--mono);fill:#fff;text-anchor:middle}
+.w-idle{stroke:var(--muted);stroke-width:1.5;stroke-dasharray:3 4;opacity:.7}
+.w-ins{font:800 11.5px var(--mono);fill:var(--text)}
+.w-n{font:10.5px var(--mono);fill:var(--muted);text-anchor:middle}
+.w-cur{fill:var(--accent);opacity:.12}
+.w-hit{fill:transparent;cursor:pointer}
+
+/* ---------- side ---------- */
+.controls{padding:14px}
+.ctl-main{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:stretch}
+.ctl-main .btn{padding:12px 16px;font-size:15.5px}
+.ctl-sub{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.ctl-sub .btn{padding:8px 6px;font-size:13px}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:12px;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+.seg button{border:none;background:var(--card2);padding:8px 4px;cursor:pointer;font-weight:700;font-size:13px;color:var(--muted);border-right:1px solid var(--line)}
+.seg button:last-child{border-right:none}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+:root[data-theme="dark"] .seg button[aria-pressed="true"]{color:#0a1120}
+.toggle{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13.5px;cursor:pointer}
+.toggle input{width:18px;height:18px;accent-color:var(--accent)}
+.kbd{font:11.5px var(--mono);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px;background:var(--card2)}
+.hint{margin:10px 0 0;font-size:12.5px;color:var(--muted)}
+
+.stepcard{padding:18px 20px}
+.step-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.badge{font:800 11.5px var(--sans);letter-spacing:.07em;padding:4px 11px;border-radius:999px;color:#fff;background:var(--muted)}
+.badge[data-p="F"]{background:var(--ph-f)} .badge[data-p="D"]{background:var(--ph-d);color:#2a1a00} .badge[data-p="E"]{background:var(--ph-e)}
+:root[data-theme="dark"] .badge{color:#07101f}
+.step-no{margin-left:auto;font-size:12.5px;color:var(--muted);font-family:var(--mono)}
+.rtl{margin:12px 0 4px;font:800 24px/1.25 var(--mono);padding:11px 14px;border-radius:12px;background:var(--code-bg);border:1px solid var(--line);word-break:break-word}
+.rtl small{display:block;font:700 11.5px var(--sans);color:var(--muted);margin-bottom:2px}
+.step-title{margin:14px 0 6px;font-size:18px;line-height:1.3}
+.step-text{margin:0;font-size:16px;line-height:1.55;min-height:3.2em}
+.tip{margin:12px 0 0;padding:10px 13px;border-radius:12px;background:color-mix(in srgb,var(--ph-d) 12%,var(--card));border:1px solid color-mix(in srgb,var(--ph-d) 45%,var(--line));font-size:14px}
+.tip b{margin-right:4px}
+.tip[hidden]{display:none}
+.bus-info{margin:12px 0 0;padding:0;list-style:none;display:grid;gap:5px;font-size:13px}
+.bus-info li{display:flex;gap:8px;align-items:baseline}
+.bus-info b{min-width:98px;font-size:12px}
+.bus-info code{font-family:var(--mono);font-weight:700}
+.bus-info .a b{color:var(--a)} .bus-info .d b{color:var(--d)} .bus-info .c b{color:var(--c)}
+.changes{margin-top:12px;display:flex;gap:6px;flex-wrap:wrap}
+.changes span{font:800 12.5px var(--mono);padding:3px 10px;border-radius:8px;background:var(--accent-soft);border:1px solid var(--accent)}
+.statline{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);font-size:13px;color:var(--muted)}
+.statline b{color:var(--text);font-family:var(--mono)}
+
+.prog{padding:12px 14px}
+.prog h3{margin:0 0 8px;font-size:14.5px}
+.listing{border:1px solid var(--line);border-radius:12px;overflow:hidden;font:14px/1 var(--mono);background:var(--code-bg)}
+.lrow{display:flex;align-items:center;gap:10px;padding:7px 10px;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent);position:relative;transition:background .25s}
+.lrow:last-child{border-bottom:none}
+.lrow .la{flex:0 0 26px;color:var(--muted);font-size:12px;text-align:right}
+.lrow .li{flex:0 0 auto;min-width:140px;font-weight:800}
+.lrow .lc{color:var(--muted);font:12px var(--sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lrow .lb{color:var(--c-cu);font-weight:700}
+.lrow .mark{position:absolute;right:8px;font:800 10.5px var(--sans);padding:2px 7px;border-radius:999px;display:none}
+.lrow.next{background:color-mix(in srgb,var(--accent) 10%,var(--code-bg))}
+.lrow.next .mark{display:block;background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent)}
+.lrow.now{background:color-mix(in srgb,var(--ph-e) 16%,var(--code-bg))}
+.lrow.now .mark{display:block;background:var(--ph-e);color:#fff}
+.lrow.dat .li{font-weight:600;color:var(--c-gen)}
+.lrow.empty{color:var(--muted);justify-content:center;padding:14px}
+.tabs{padding:0;overflow:hidden}
+.tabbar{display:flex;border-bottom:1px solid var(--line);background:var(--card2);overflow-x:auto}
+.tabbar button{flex:1;white-space:nowrap;padding:12px 12px;border:none;background:none;cursor:pointer;font-weight:700;font-size:13.5px;color:var(--muted);border-bottom:3px solid transparent}
+.tabbar button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);background:var(--card)}
+.panel{padding:14px 16px}
+.panel[hidden]{display:none}
+.panel h4{margin:0 0 6px;font-size:14px}
+.small{font-size:12.5px;color:var(--muted);margin:4px 0}
+textarea{width:100%;min-height:230px;resize:vertical;border:1px solid var(--line);background:var(--code-bg);border-radius:12px;padding:10px 12px;font:13.5px/1.6 var(--mono);tab-size:4}
+.inputs{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
+.inputs label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600}
+.inputs input{width:72px;padding:6px 8px;border:1px solid var(--line);border-radius:9px;background:var(--card2);font-family:var(--mono)}
+.errors{margin:8px 0 0;padding:9px 13px;border-radius:11px;background:color-mix(in srgb,var(--bad) 12%,var(--card));border:1px solid var(--bad);font-size:13px}
+.errors[hidden]{display:none}
+.errors ul{margin:4px 0 0;padding-left:18px}
+table.t{width:100%;border-collapse:collapse;font-size:13px}
+table.t th,table.t td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+table.t th{font-size:12px;color:var(--muted);font-weight:700}
+table.t td.m{font-family:var(--mono);font-weight:700}
+table.t tr.now{background:var(--accent-soft)}
+table.t tr.grp td{font-weight:800;background:var(--card2);font-size:12.5px}
+.quiz-q{font-weight:700;margin:6px 0 10px;font-size:15px}
+.quiz-opt{display:block;width:100%;text-align:left;margin:6px 0;padding:10px 13px;border-radius:11px;border:1.5px solid var(--line);background:var(--card2);cursor:pointer}
+.quiz-opt:hover:not(:disabled){border-color:var(--accent)}
+.quiz-opt.ok{background:color-mix(in srgb,var(--ok) 18%,var(--card));border-color:var(--ok)}
+.quiz-opt.bad{background:color-mix(in srgb,var(--bad) 16%,var(--card));border-color:var(--bad)}
+.quiz-ex{margin-top:10px;font-size:13.5px;padding:9px 13px;border-radius:11px;background:var(--code-bg)}
+.freq{display:flex;gap:8px;align-items:center;margin:10px 0;font-size:13px}
+.freq input{width:80px;padding:6px 8px;border:1px solid var(--line);border-radius:9px;background:var(--card2);font-family:var(--mono)}
+
+.predict{padding:16px 18px;border:2px solid var(--ph-d)}
+.predict h3{margin:0 0 4px;font-size:17px}
+.predict p{margin:0 0 10px;font-size:13.5px;color:var(--muted)}
+.opts{display:grid;gap:8px}
+.opt{text-align:left;padding:11px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--card2);cursor:pointer;font:800 15.5px var(--mono)}
+.opt:hover:not(:disabled){border-color:var(--accent);background:var(--accent-soft)}
+.opt.ok{background:color-mix(in srgb,var(--ok) 18%,var(--card));border-color:var(--ok)}
+.opt.bad{background:color-mix(in srgb,var(--bad) 16%,var(--card));border-color:var(--bad)}
+.fb{margin-top:10px;font-size:13.5px;min-height:20px}
+
+dialog{border:1px solid var(--line);border-radius:20px;background:var(--card);color:var(--text);padding:0;max-width:820px;width:calc(100% - 28px);box-shadow:0 24px 70px rgba(0,0,0,.4)}
+dialog::backdrop{background:rgba(8,15,30,.6);backdrop-filter:blur(3px)}
+.dlg{padding:24px 28px 22px;max-height:86vh;overflow:auto}
+.dlg h2{margin:0 0 4px;font-size:22px}
+.dlg h3{margin:18px 0 6px;font-size:15.5px}
+.dlg ul,.dlg ol{margin:6px 0;padding-left:22px}
+.dlg li{margin:4px 0}
+.dlg code{font-family:var(--mono);background:var(--code-bg);padding:1px 6px;border-radius:5px;font-size:13px}
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0}
+.three div{padding:10px 12px;border-radius:13px;border:1px solid var(--line);background:var(--card2);font-size:13.5px}
+.three b{display:block;font-size:14.5px;margin-bottom:2px}
+@media (max-width:640px){.three{grid-template-columns:1fr}}
+.calm .bus.active,.calm .box.active .gear,.calm .ptr-mar rect,.calm .chip.next{animation:none}.calm .pop,.calm .box.flash .bg{animation:none}.calm .w-clk.draw{animation:none;stroke-dashoffset:0}.calm .w-bar.new{animation:none}.calm .ptr{transition:none}
+.motion{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.motion input{width:17px;height:17px;accent-color:var(--accent)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <div class="logo" aria-hidden="true">⚙</div>
+    <div>
+      <h1>CPU chạy một lệnh như thế nào?</h1>
+      <p>Mô phỏng chu kỳ Nạp – Giải mã – Thực thi với hợp ngữ MOV, ADD, CMP, JMP…</p>
+    </div>
+  </div>
+  <div class="top-actions">
+    <label>Chương trình
+      <select id="preset" aria-label="Chọn chương trình mẫu"></select>
+    </label>
+    <a class="btn" href="mo-phong-tap-lenh.html" style="text-decoration:none;color:var(--text)" title="Học các lệnh Assembly và luyện bài tập">MOV Tập lệnh &amp; bài tập</a>
+    <label class="motion" title="Tắt nếu máy chậm hoặc bạn không muốn hiệu ứng chuyển động"><input type="checkbox" id="motion" checked> Hiệu ứng chuyển động</label>
+    <button class="btn" id="btnHelp" type="button">Hướng dẫn</button>
+    <button class="btn" id="btnTheme" type="button" aria-label="Đổi giao diện sáng hoặc tối">Sáng / Tối</button>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="stage" aria-label="Sơ đồ CPU">
+    <div class="card cyc">
+      <div class="phasebar" aria-hidden="true">
+        <div class="phase" data-p="F"><b>1 · NẠP LỆNH</b><span>Lấy lệnh từ RAM về CPU</span></div>
+        <div class="phase" data-p="D"><b>2 · GIẢI MÃ</b><span>CU xem đây là lệnh gì</span></div>
+        <div class="phase" data-p="E"><b>3 · THỰC THI</b><span>Làm đúng việc lệnh yêu cầu</span></div>
+      </div>
+      <div class="insline" id="insline"></div>
+      <div id="chips" aria-live="polite"></div>
+    </div>
+
+    <div class="card diagram">
+      <svg id="svg" viewBox="0 0 1030 790" role="img" aria-label="Sơ đồ khối CPU gồm PC, MAR, MBR, IR, CU, thanh ghi AX BX CX DX, ALU, cờ FLAGS, bus trong, ba bus ngoài và bộ nhớ RAM"></svg>
+      <div class="legend">
+        <span><i style="background:var(--c-fetch)"></i>Thanh ghi lấy lệnh</span>
+        <span><i style="background:var(--c-gen)"></i>Thanh ghi dữ liệu</span>
+        <span><i style="background:var(--c-alu)"></i>ALU (tính toán)</span>
+        <span><i style="background:var(--c-cu)"></i>CU (điều khiển)</span>
+        <span><i style="background:var(--c-flag)"></i>Cờ trạng thái</span>
+        <span><i class="l" style="background:var(--a)"></i>Bus địa chỉ</span>
+        <span><i class="l" style="background:var(--d)"></i>Bus dữ liệu</span>
+        <span><i class="l" style="background:var(--c)"></i>Bus điều khiển</span>
+      </div>
+    </div>
+
+    <div class="card wave">
+      <div class="wave-head"><b>Giản đồ xung nhịp</b><span class="small">Mỗi cột là 1 chu kỳ clock. Bấm vào một cột để quay lại bước đó.</span></div>
+      <div class="wave-body">
+        <div class="wave-lab"><svg id="waveLab" width="96" height="206"></svg></div>
+        <div class="wave-scroll" id="waveScroll"><svg id="waveSvg" height="206"></svg></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="side">
+    <div class="card controls">
+      <div class="ctl-main">
+        <button class="btn" id="bPrev" type="button" title="Phím ←">◀ Lùi</button>
+        <button class="btn primary" id="bPlay" type="button" title="Phím cách">▶ Tự chạy</button>
+        <button class="btn" id="bNext" type="button" title="Phím →">Tiếp ▶</button>
+      </div>
+      <div class="ctl-sub">
+        <button class="btn" id="bReset" type="button" title="Phím R">↺ Làm lại</button>
+        <button class="btn" id="bInstr" type="button">⏭ Hết lệnh này</button>
+        <button class="btn" id="bHalt" type="button">⏩ Đến HLT</button>
+      </div>
+      <div class="seg" id="speedSeg" role="group" aria-label="Tốc độ">
+        <button type="button" data-s="0.6" aria-pressed="false">Chậm</button>
+        <button type="button" data-s="1" aria-pressed="true">Vừa</button>
+        <button type="button" data-s="2.2" aria-pressed="false">Nhanh</button>
+        <button type="button" data-s="4" aria-pressed="false">Rất nhanh</button>
+      </div>
+      <label class="toggle"><input type="checkbox" id="predict"> Chế độ thử thách: đoán bước tiếp theo</label>
+      <p class="hint"><span class="kbd">Space</span> chạy/dừng · <span class="kbd">→</span> tiếp · <span class="kbd">←</span> lùi · <span class="kbd">R</span> làm lại</p>
+    </div>
+
+    <div id="predictBox"></div>
+
+    <div class="card stepcard" aria-live="polite">
+      <div class="step-head">
+        <span class="badge" id="badge" data-p="">SẴN SÀNG</span>
+        <span class="step-no" id="stepNo"></span>
+      </div>
+      <div class="rtl"><small>Vi thao tác (CPU đang làm gì)</small><span id="rtlTxt">—</span></div>
+      <h2 class="step-title" id="stepTitle"></h2>
+      <p class="step-text" id="stepText"></p>
+      <p class="tip" id="tip" hidden></p>
+      <ul class="bus-info" id="busInfo"></ul>
+      <div class="changes" id="changes"></div>
+      <div class="statline">
+        <span>Lệnh xong: <b id="stI">0</b></span>
+        <span>Chu kỳ clock: <b id="stC">0</b></span>
+        <span>CPI trung bình: <b id="stCPI">—</b></span>
+      </div>
+    </div>
+
+    <div class="card prog">
+      <h3>Chương trình đang chạy <span class="small" style="font-weight:400">(số bên trái là địa chỉ ô nhớ chứa lệnh)</span></h3>
+      <div class="listing" id="listing"></div>
+    </div>
+
+    <div class="card tabs">
+      <div class="tabbar" role="tablist">
+        <button role="tab" aria-selected="true" data-tab="prog">Soạn chương trình</button>
+        <button role="tab" aria-selected="false" data-tab="micro">Bảng vi thao tác</button>
+        <button role="tab" aria-selected="false" data-tab="stats">Thống kê CPI</button>
+        <button role="tab" aria-selected="false" data-tab="quiz">Kiểm tra</button>
+      </div>
+
+      <div class="panel" id="tab-prog">
+        <div id="presetDesc" class="small"></div>
+        <div class="inputs" id="presetInputs"></div>
+        <textarea id="src" spellcheck="false" aria-label="Mã hợp ngữ"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn primary" id="bAsm" type="button">Nạp vào RAM</button>
+          <span class="small">RAM có 16 ô (địa chỉ 0–15). Mỗi lệnh chiếm 1 ô.</span>
+        </div>
+        <div class="errors" id="errors" hidden></div>
+        <h4 style="margin-top:14px">Các lệnh được hỗ trợ</h4>
+        <table class="t" id="isaTable"></table>
+        <p class="small">Viết <code>[x]</code> để lấy nội dung ô nhớ đặt tên x, hoặc <code>[10]</code> để lấy ô số 10. Khai báo dữ liệu: <code>x DW 5</code>. <code>ORG n</code> đặt địa chỉ bắt đầu. Dấu <code>;</code> mở đầu chú thích.</p>
+      </div>
+
+      <div class="panel" id="tab-micro" hidden>
+        <p class="small">Dòng đang thực hiện được tô sáng. Mọi lệnh đều bắt đầu bằng 4 bước nạp lệnh và 1 bước giải mã; phần thực thi tùy từng lệnh.</p>
+        <table class="t" id="microTable"></table>
+      </div>
+
+      <div class="panel" id="tab-stats" hidden>
+        <p class="small">Mỗi vi thao tác tính là 1 chu kỳ clock, nên lệnh nào chạm RAM sẽ tốn nhiều chu kỳ hơn. Từ đó có thể tính <b>CPU time = IC × CPI × chu kỳ clock</b>.</p>
+        <table class="t" id="statTable"></table>
+        <div class="freq">Tần số xung nhịp <input id="freq" type="number" min="0.001" step="any" value="1"> MHz</div>
+        <div id="timeOut" class="small"></div>
+      </div>
+
+      <div class="panel" id="tab-quiz" hidden>
+        <div id="quizBox"></div>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<dialog id="help">
+  <div class="dlg">
+    <h2>CPU chạy lệnh như thế nào?</h2>
+    <p>Trang này cho bạn xem từng bước CPU nạp, hiểu và thực hiện một chương trình hợp ngữ đơn giản. Mọi thứ đều chuyển động: dữ liệu chạy trên dây, thanh ghi đổi giá trị, giản đồ xung nhịp vẽ thêm một cột sau mỗi chu kỳ.</p>
+    <div class="three">
+      <div><b style="color:var(--ph-f)">1 · Nạp lệnh</b>CPU xem PC đang trỏ vào ô nhớ nào, rồi lấy lệnh ở đó về thanh ghi IR.</div>
+      <div><b style="color:var(--ph-d)">2 · Giải mã</b>Đơn vị điều khiển (CU) đọc mã lệnh để biết đây là MOV, ADD hay JMP…</div>
+      <div><b style="color:var(--ph-e)">3 · Thực thi</b>CPU làm đúng việc đó: chép dữ liệu, tính toán trên ALU hoặc nhảy sang lệnh khác.</div>
+    </div>
+    <h3>Cách dùng</h3>
+    <ol>
+      <li>Bấm <b>Tự chạy</b> để xem liên tục, hoặc <b>Tiếp</b> để xem từng vi thao tác. Chọn tốc độ Chậm / Vừa / Nhanh.</li>
+      <li>Thành phần đang tham gia được tô màu, các thành phần khác mờ đi. Viên thuốc nhỏ chạy trên dây là giá trị đang được chuyển.</li>
+      <li>Khung bên phải giải thích bằng lời, kèm một ví dụ đời thường.</li>
+      <li>Muốn thử chương trình khác, chọn ở ô <b>Chương trình</b> hoặc tự viết trong thẻ <b>Soạn chương trình</b>.</li>
+    </ol>
+    <h3>Các thành phần chính</h3>
+    <ul>
+      <li><b>PC</b> (IP trong 8086): địa chỉ của lệnh kế tiếp · <b>MAR</b>: địa chỉ ô nhớ cần đọc/ghi · <b>MBR</b>: dữ liệu vào/ra RAM · <b>IR</b>: lệnh đang thực hiện.</li>
+      <li><b>AX, BX, CX, DX</b>: thanh ghi dùng để chứa số · <b>ALU</b>: làm phép tính · <b>FLAGS</b>: các cờ ZF, SF, CF, OF ghi lại đặc điểm kết quả.</li>
+      <li>ZF=1: kết quả bằng 0 · SF=1: kết quả âm · CF=1: phép cộng có nhớ / phép trừ có mượn · OF=1: tràn số có dấu.</li>
+    </ul>
+    <p class="small">Đây là mô hình đơn giản hóa để dạy: mỗi vi thao tác tính 1 chu kỳ, không có pipeline hay cache, và lệnh được hiển thị dạng chữ thay vì mã nhị phân.</p>
+    <p style="text-align:right;margin:16px 0 0"><button class="btn primary" id="helpClose" type="button">Bắt đầu xem</button></p>
+  </div>
+</dialog>
+
+<script>
+(() => {
+'use strict';
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const NS = 'http://www.w3.org/2000/svg';
+// Cố ý KHÔNG theo prefers-reduced-motion của hệ điều hành: chuyển động chính là nội dung bài học.
+// Người dùng tự tắt bằng công tắc “Hiệu ứng chuyển động” trên đầu trang.
+let calm = false;
+const mk = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+
+/* =====================================================================
+   1. Tập lệnh, trình hợp ngữ
+   ===================================================================== */
+const REGS = ['AX', 'BX', 'CX', 'DX'];
+const OPS = ['MOV','ADD','SUB','CMP','INC','DEC','JMP','JE','JNE','JA','JB','LOOP','HLT'];
+const ALIAS = {JZ:'JE', JNZ:'JNE'};
+const JUMPS = ['JMP','JE','JNE','JA','JB','LOOP'];
+const MEANING = {
+  MOV:'chép dữ liệu từ nguồn sang đích (nguồn giữ nguyên)',
+  ADD:'cộng nguồn vào đích', SUB:'trừ nguồn khỏi đích',
+  CMP:'so sánh: trừ như SUB nhưng bỏ kết quả, chỉ cập nhật cờ',
+  INC:'tăng toán hạng thêm 1', DEC:'giảm toán hạng đi 1',
+  JMP:'nhảy không điều kiện sang lệnh khác',
+  JE:'nhảy nếu bằng (ZF = 1)', JNE:'nhảy nếu khác (ZF = 0)',
+  JA:'nhảy nếu lớn hơn, không dấu (CF = 0 và ZF = 0)', JB:'nhảy nếu nhỏ hơn, không dấu (CF = 1)',
+  LOOP:'giảm CX đi 1, nếu CX ≠ 0 thì nhảy', HLT:'dừng CPU'
+};
+const FORMS = {
+  MOV:'MOV AX, 5 · MOV AX, BX · MOV AX, [x] · MOV [x], AX', ADD:'ADD AX, BX / số / [x]', SUB:'SUB AX, BX / số / [x]', CMP:'CMP AX, BX / số / [x]',
+  INC:'INC AX', DEC:'DEC AX', JMP:'JMP nhãn', JE:'JE nhãn (cũng viết JZ)', JNE:'JNE nhãn (cũng viết JNZ)', JA:'JA nhãn', JB:'JB nhãn', LOOP:'LOOP nhãn', HLT:'HLT'
+};
+const hex4 = v => '0x' + (v & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+const bin4 = v => (v & 15).toString(2).padStart(4, '0');
+const sgn16 = v => v >= 32768 ? v - 65536 : v;
+const opText = o => o.t === 'reg' ? o.r : o.t === 'imm' ? String(o.v) : `[${o.lab || o.a}]`;
+const insText = i => !i ? '—' : i.op === 'HLT' ? 'HLT' : i.tgt !== undefined ? `${i.op} ${i.lab || i.tgt}` : i.s ? `${i.op} ${opText(i.d)}, ${opText(i.s)}` : `${i.op} ${opText(i.d)}`;
+const parseNum = t => {
+  if (t == null) return NaN;
+  if (/^[-+]?\d+$/.test(t)) return parseInt(t, 10);
+  if (/^0x[0-9a-f]+$/i.test(t)) return parseInt(t, 16);
+  if (/^[0-9][0-9a-f]*h$/i.test(t)) return parseInt(t, 16);
+  return NaN;
+};
+
+function assemble(src) {
+  const cells = Array.from({length:16}, () => ({k:''})), errors = [], labels = {}, items = [], listing = [];
+  let addr = 0;
+  const isIdent = t => /^[A-Za-z_]\w*$/.test(t) && !OPS.includes(t.toUpperCase()) && !(t.toUpperCase() in ALIAS) && !REGS.includes(t.toUpperCase()) && !['DW','ORG'].includes(t.toUpperCase());
+  src.split(/\r?\n/).forEach((raw, i) => {
+    const ln = i + 1, cm = raw.match(/(;|\/\/)\s*(.*)$/), comment = cm ? cm[2] : '';
+    let line = raw.replace(/(;|\/\/).*$/, '').replace(/\[\s*/g, '[').replace(/\s*\]/g, ']').trim();
+    if (!line) return;
+    let label = null;
+    const m = line.match(/^([A-Za-z_]\w*)\s*:\s*(.*)$/);
+    if (m) {
+      if (!isIdent(m[1])) errors.push(`Dòng ${ln}: “${m[1]}” không dùng làm tên nhãn được (trùng tên lệnh hoặc thanh ghi).`);
+      else { if (m[1].toLowerCase() in labels) errors.push(`Dòng ${ln}: nhãn “${m[1]}” bị trùng.`); labels[m[1].toLowerCase()] = addr; label = m[1]; }
+      line = m[2].trim();
+      if (!line) { listing.push({addr, label, comment, kind:'label'}); return; }
+    }
+    const tk = line.split(/[\s,]+/).filter(Boolean);
+    let op = tk[0].toUpperCase();
+    if (op === 'ORG') { const v = parseNum(tk[1]); if (isNaN(v) || v < 0 || v > 15) errors.push(`Dòng ${ln}: ORG cần địa chỉ từ 0 đến 15.`); else addr = v; return; }
+    // khai báo dữ liệu: "x DW 5" hoặc "DW 5"
+    let dataLab = label, di = -1;
+    if (op === 'DW') di = 0;
+    else if (tk[1] && tk[1].toUpperCase() === 'DW' && isIdent(tk[0])) { dataLab = tk[0]; di = 1; if (tk[0].toLowerCase() in labels) errors.push(`Dòng ${ln}: tên “${tk[0]}” bị trùng.`); labels[tk[0].toLowerCase()] = addr; }
+    if (di >= 0) {
+      if (tk.length < di + 2) errors.push(`Dòng ${ln}: DW cần một giá trị, ví dụ x DW 5.`);
+      tk.slice(di + 1).forEach(t => { items.push({ln, addr, type:'d', val:t, lab:dataLab, comment}); dataLab = null; addr++; });
+      return;
+    }
+    if (op in ALIAS) op = ALIAS[op];
+    if (!OPS.includes(op)) { errors.push(`Dòng ${ln}: không hiểu “${tk[0]}”. Các lệnh có sẵn: ${OPS.join(', ')}.`); return; }
+    items.push({ln, addr, type:'c', op, args:tk.slice(1), label, comment});
+    addr++;
+  });
+  const parseOpnd = (t, ln) => {
+    const u = t.toUpperCase();
+    if (REGS.includes(u)) return {t:'reg', r:u};
+    const mm = t.match(/^\[(.+)\]$/);
+    if (mm) {
+      const inner = mm[1], k = inner.toLowerCase();
+      let a = k in labels ? labels[k] : parseNum(inner);
+      if (isNaN(a) || a < 0 || a > 15) { errors.push(`Dòng ${ln}: ô nhớ “[${inner}]” không hợp lệ (địa chỉ 0–15 hoặc tên đã khai báo).`); a = 0; }
+      return {t:'mem', a, lab:(k in labels) ? inner : null};
+    }
+    const v = parseNum(t);
+    if (isNaN(v) || v < -32768 || v > 65535) { errors.push(`Dòng ${ln}: “${t}” không phải số hay thanh ghi. Muốn lấy nội dung ô nhớ hãy viết [${t}].`); return {t:'imm', v:0}; }
+    return {t:'imm', v:v & 0xFFFF};
+  };
+  items.forEach(it => {
+    if (it.addr > 15) { errors.push(`Dòng ${it.ln}: vượt quá RAM 16 ô (địa chỉ 0–15).`); return; }
+    if (cells[it.addr].k) errors.push(`Dòng ${it.ln}: ô nhớ ${it.addr} bị ghi chồng.`);
+    if (it.type === 'd') {
+      const v = parseNum(it.val);
+      if (isNaN(v) || v < -32768 || v > 65535) errors.push(`Dòng ${it.ln}: giá trị “${it.val}” phải là số trong khoảng −32768…65535.`);
+      cells[it.addr] = {k:'d', v:(v & 0xFFFF) || 0, lab:it.lab};
+      listing.push({addr:it.addr, label:it.lab, kind:'d', comment:it.comment});
+      return;
+    }
+    const {op, args, ln} = it; let ins = {op}, ok = true;
+    const need = n => { if (args.length !== n) { errors.push(`Dòng ${ln}: ${op} cần ${n} toán hạng (${FORMS[op].split(' · ')[0]}).`); ok = false; } };
+    if (op === 'HLT') need(0);
+    else if (JUMPS.includes(op)) {
+      need(1);
+      if (ok) { const k = args[0].toLowerCase(); let a = k in labels ? labels[k] : parseNum(args[0]);
+        if (isNaN(a) || a < 0 || a > 15) { errors.push(`Dòng ${ln}: không tìm thấy nhãn “${args[0]}”.`); a = 0; }
+        ins.tgt = a; ins.lab = k in labels ? args[0] : null; }
+    } else if (op === 'INC' || op === 'DEC') {
+      need(1);
+      if (ok) { const d = parseOpnd(args[0], ln); if (d.t !== 'reg') { errors.push(`Dòng ${ln}: ${op} chỉ dùng với thanh ghi (AX, BX, CX, DX).`); } ins.d = d; }
+    } else {
+      need(2);
+      if (ok) {
+        const d = parseOpnd(args[0], ln), s = parseOpnd(args[1], ln);
+        if (op === 'MOV') {
+          if (d.t === 'imm') errors.push(`Dòng ${ln}: không thể MOV vào một con số. Đích phải là thanh ghi hoặc ô nhớ.`);
+          if (d.t === 'mem' && s.t === 'mem') errors.push(`Dòng ${ln}: MOV không chép trực tiếp từ ô nhớ sang ô nhớ. Hãy đi qua một thanh ghi.`);
+          if (d.t === 'mem' && s.t === 'imm') errors.push(`Dòng ${ln}: chưa hỗ trợ MOV [ô nhớ], số. Hãy MOV số vào thanh ghi trước, rồi MOV [ô nhớ], thanh ghi.`);
+        } else if (d.t !== 'reg') errors.push(`Dòng ${ln}: ${op} cần đích là thanh ghi (AX, BX, CX, DX).`);
+        ins.d = d; ins.s = s;
+      }
+    }
+    cells[it.addr] = {k:'c', ins};
+    listing.push({addr:it.addr, label:it.label, kind:'c', comment:it.comment});
+  });
+  listing.sort((a, b) => a.addr - b.addr);
+  return {cells, errors, listing};
+}
+
+/* ---------- chương trình mẫu ---------- */
+const PRESETS = [
+  {
+    name: '1 · Cộng hai số (làm quen)',
+    desc: 'Chương trình ngắn nhất: nạp hai số vào thanh ghi rồi cộng. Dành cho lần xem đầu tiên.',
+    inputs: [{k:'A', label:'Số thứ nhất', v:5, min:0, max:999}, {k:'B', label:'Số thứ hai', v:3, min:0, max:999}],
+    src: v => `; Tính ${v.A} + ${v.B}, kết quả nằm trong AX
+        MOV AX, ${v.A}    ; AX ← ${v.A}
+        MOV BX, ${v.B}    ; BX ← ${v.B}
+        ADD AX, BX    ; AX ← AX + BX
+        HLT`
+  },
+  {
+    name: '2 · Dùng bộ nhớ RAM',
+    desc: 'Lấy hai số từ RAM, cộng, rồi cất kết quả trở lại RAM. Xem bus địa chỉ, bus dữ liệu và tín hiệu READ / WRITE hoạt động.',
+    inputs: [{k:'A', label:'x', v:5, min:0, max:999}, {k:'B', label:'y', v:3, min:0, max:999}],
+    src: v => `; kq = x + y   (x, y, kq là các ô nhớ trong RAM)
+        MOV AX, [x]   ; đọc x từ RAM
+        ADD AX, [y]   ; cộng thêm y (đọc từ RAM)
+        MOV [kq], AX  ; ghi kết quả vào RAM
+        HLT
+
+ORG 8
+x   DW ${v.A}
+y   DW ${v.B}
+kq  DW 0`
+  },
+  {
+    name: '3 · Vòng lặp LOOP: 1 + 2 + … + N',
+    desc: 'LOOP giảm CX đi 1 rồi nhảy về nhãn cho đến khi CX = 0. Xem PC bị ghi đè khi nhảy.',
+    inputs: [{k:'N', label:'N', v:4, min:1, max:9}],
+    src: v => `; AX = 1 + 2 + ... + N   (CX đếm từ N về 0)
+        MOV AX, 0
+        MOV CX, ${v.N}
+lap:    ADD AX, CX    ; cộng CX vào AX
+        LOOP lap      ; CX ← CX − 1, CX ≠ 0 thì quay lại lap
+        MOV [kq], AX
+        HLT
+
+ORG 10
+kq  DW 0`
+  },
+  {
+    name: '4 · So sánh và rẽ nhánh (CMP, JB)',
+    desc: 'CMP so sánh hai số bằng cách trừ rồi chỉ giữ lại cờ. JB nhìn cờ CF để quyết định nhảy hay không.',
+    inputs: [{k:'A', label:'AX', v:7, min:0, max:999}, {k:'B', label:'BX', v:12, min:0, max:999}],
+    src: v => `; DX = số lớn hơn trong AX và BX
+        MOV AX, ${v.A}
+        MOV BX, ${v.B}
+        CMP AX, BX    ; so sánh (chỉ cập nhật cờ)
+        JB  b_lon     ; nếu AX < BX thì nhảy tới b_lon
+        MOV DX, AX    ; AX lớn hơn hoặc bằng
+        JMP xong
+b_lon:  MOV DX, BX    ; BX lớn hơn
+xong:   HLT`
+  },
+  {
+    name: '5 · Tự viết chương trình',
+    desc: 'Soạn mã ở khung bên dưới rồi bấm “Nạp vào RAM”. Thử INC, DEC, SUB, các lệnh nhảy…',
+    inputs: [],
+    src: () => `; Ví dụ: AX = 10, trừ 4, rồi tăng 1
+        MOV AX, 10
+        SUB AX, 4
+        INC AX
+        HLT`
+  }
+];
+
+/* =====================================================================
+   2. Máy trạng thái vi thao tác
+   ===================================================================== */
+const clone = o => JSON.parse(JSON.stringify(o));
+const emptyStat = () => Object.fromEntries(OPS.map(m => [m, {n:0, clk:0}]));
+function initState(p) {
+  return {pc:0, mar:0, mbr:null, ir:null, irOk:false, reg:{AX:0, BX:0, CX:0, DX:0}, f:{z:0, s:0, c:0, o:0}, mem:clone(p.cells),
+    stage:'F1', alu:null, decoded:null, sig:'—', curAddr:-1, halted:false, instr:0, clk:0, curClk:0, stat:emptyStat()};
+}
+const FETCH = ['F1','F2','F3','F4','D'];
+const memOp = i => i.d.t === 'mem' ? i.d : i.s;
+function plan(i) {
+  if (!i) return ['H1'];
+  switch (i.op) {
+    case 'MOV': if (i.d.t === 'mem') return ['X1','S2','S3']; if (i.s.t === 'imm') return ['M1i']; if (i.s.t === 'reg') return ['M1r']; return ['X1','X2','M3'];
+    case 'ADD': case 'SUB': return [...(i.s.t === 'mem' ? ['X1','X2'] : []), 'A1', i.s.t === 'imm' ? 'A2i' : i.s.t === 'reg' ? 'A2r' : 'A2m', 'A3', 'A4'];
+    case 'CMP': return [...(i.s.t === 'mem' ? ['X1','X2'] : []), 'A1', i.s.t === 'imm' ? 'A2i' : i.s.t === 'reg' ? 'A2r' : 'A2m', 'A4'];
+    case 'INC': case 'DEC': return ['A1','A3','A4'];
+    case 'JMP': case 'JE': case 'JNE': case 'JA': case 'JB': return ['J1'];
+    case 'LOOP': return ['L1','L2'];
+    default: return ['H1'];
+  }
+}
+function after(s, cur) {
+  const k = FETCH.indexOf(cur);
+  if (k >= 0 && k < 4) return FETCH[k + 1];
+  const p = plan(s.ir);
+  if (cur === 'D') return p[0];
+  const j = p.indexOf(cur);
+  return j < p.length - 1 ? p[j + 1] : 'F1';
+}
+const RTL = {
+  F1:() => 'MAR ← PC', F2:() => 'PC ← PC + 1', F3:() => 'MBR ← MM[MAR]', F4:() => 'IR ← MBR', D:() => 'CU ← IR(mã lệnh)',
+  X1:() => 'MAR ← IR(địa chỉ)', X2:() => 'MBR ← MM[MAR]', M1i:i => `${i.d.r} ← IR(số)`, M1r:i => `${i.d.r} ← ${i.s.r}`, M3:i => `${i.d.r} ← MBR`,
+  S2:i => `MBR ← ${i.s.r}`, S3:() => 'MM[MAR] ← MBR',
+  A1:i => i.op === 'INC' ? `ALU ← ${i.d.r} + 1` : i.op === 'DEC' ? `ALU ← ${i.d.r} − 1` : `ALU ← ${i.d.r}`,
+  A2i:() => 'ALU ← IR(số)', A2r:i => `ALU ← ${i.s.r}`, A2m:() => 'ALU ← MBR', A3:i => `${i.d.r} ← ALU`, A4:() => 'FLAGS ← ALU',
+  J1:() => 'PC ← IR(đích) nếu thỏa điều kiện', L1:() => 'CX ← CX − 1', L2:() => 'PC ← IR(đích) nếu CX ≠ 0', H1:() => 'Dừng CPU (HLT)'
+};
+const shortOf = (id, ins) => (RTL[id](ins || {d:{r:'?'}, s:{r:'?'}})).replace(' ← ', '←').replace(/ nếu.*/, '').replace('IR(mã lệnh)', 'IR(op)').replace('IR(địa chỉ)', 'IR(đ/c)');
+const LEC = {F1:'1', F2:'2', F3:'3', F4:'4', D:'4a', X1:'5', X2:'6', A2i:'7a', A2r:'7a', A2m:'7a', A1:'7b', A3:'8', A4:'9'};
+const cellText = c => c.k === 'c' ? insText(c.ins) : c.k === 'd' ? String(c.v) : '(trống)';
+const memVal = (st, a) => st.mem[a].k === 'd' ? st.mem[a].v : 0;
+const getVal = (st, o) => o.t === 'reg' ? st.reg[o.r] : o.t === 'imm' ? o.v : memVal(st, o.a);
+
+function alu(op, a, b) {
+  const M = 0xFFFF; let raw, res, c, o;
+  if (op === '+') { raw = a + b; res = raw & M; c = +(raw > M); o = +(((a ^ res) & (b ^ res) & 0x8000) !== 0); }
+  else { raw = a - b; res = raw & M; c = +(a < b); o = +(((a ^ b) & (a ^ res) & 0x8000) !== 0); }
+  return {res, f:{z:+(res === 0), s:res >> 15, c, o}};
+}
+const mv = (from, to, text, kind = 'int') => ({t:'move', from, to, text, kind});
+const bus = (b, text, rev = false) => ({t:'bus', bus:b, text, rev});
+
+function describe(st) {
+  const id = st.stage, ins = st.ir, d = ins && ins.d, s = ins && ins.s;
+  const M = o => Object.assign({id, lec:LEC[id] || '—', rtl:RTL[id](ins || {d:{r:'?'}, s:{r:'?'}}), sig:'—', boxes:[], ram:null, ir:null, wave:{}, bus:{a:'—', d:'—', c:'—', note:'Truyền bên trong CPU qua bus trong, chưa dùng bus ngoài.'}, tip:'', beats:[]}, o);
+  const readBus = (v, tag) => ({a:`${st.mar}`, d:tag, c:'READ'});
+  switch (id) {
+    case 'F1': return M({phase:'F', title:'Chép địa chỉ lệnh từ PC sang MAR',
+      text:`PC đang là ${st.pc}: lệnh kế tiếp nằm ở ô nhớ số ${st.pc}. CPU chép số ${st.pc} sang MAR để chuẩn bị “gọi” ô nhớ đó.`,
+      tip:'PC giống ngón tay đang chỉ vào dòng lệnh sắp đọc. MAR giống tờ giấy nhớ ghi số trang cần mở trước khi nhờ thủ thư lấy sách.',
+      boxes:['PC','MAR'], beats:[[mv('PC','MAR',st.pc)]], wave:{ins:insText(st.mem[st.pc].k === 'c' ? st.mem[st.pc].ins : null)},
+      apply:x => { x.mar = x.pc; x.curAddr = x.pc; x.alu = null; x.decoded = null; x.sig = '—'; x.irOk = false; }});
+    case 'F2': return M({phase:'F', title:'Tăng PC thêm 1',
+      text:`Ngay sau khi lấy địa chỉ, PC tăng lên ${(st.pc + 1) & 15} để lần sau trỏ vào lệnh kế tiếp. Làm sớm như vậy để khi CPU còn đang xử lý lệnh này, PC đã sẵn sàng.`,
+      tip:'Đọc xong một dòng thì ngón tay tự dịch xuống dòng dưới. Riêng lệnh nhảy sẽ “nhấc ngón tay” đặt sang chỗ khác.',
+      boxes:['PC'], beats:[[{t:'float', at:'PC', text:'+1'}]], apply:x => { x.pc = (x.pc + 1) & 15; x.sig = '—'; }});
+    case 'F3': { const c = st.mem[st.mar]; return M({phase:'F', title:'Đọc lệnh từ RAM vào MBR', sig:'READ',
+      text:`CPU đặt địa chỉ ${st.mar} lên bus địa chỉ và gửi tín hiệu READ. RAM tìm ô nhớ số ${st.mar} và trả nội dung “${cellText(c)}” về CPU qua bus dữ liệu, rơi vào MBR.`,
+      tip:'MBR là “khay nhận hàng”: mọi thứ đi ra hoặc vào RAM đều phải dừng ở đây.',
+      bus:readBus(0, cellText(c)), boxes:['MAR','MBR','CU'], ram:{row:st.mar, mode:'read'},
+      beats:[[bus('ctrl', 'READ'), bus('addr', st.mar), {t:'laser', row:st.mar}], [bus('data', cellText(c), true)]], wave:{addr:st.mar, data:cellText(c), ctrl:'READ'},
+      apply:x => { const k = x.mem[x.mar]; x.mbr = k.k === 'c' ? {ins:k.ins} : {v:k.k === 'd' ? k.v : 0, raw:true}; x.sig = 'READ'; }}); }
+    case 'F4': return M({phase:'F', title:'Chuyển lệnh từ MBR sang IR',
+      text: st.mbr.ins
+        ? `Lệnh “${insText(st.mbr.ins)}” được chép vào thanh ghi lệnh IR. IR tách lệnh thành các phần: mã lệnh, đích và nguồn.`
+        : `Ô nhớ vừa đọc chứa dữ liệu (${st.mbr.v}) chứ không phải lệnh. CPU vẫn chép vào IR, nhưng ở bước sau CU sẽ không hiểu được.`,
+      tip:'IR là “tờ lệnh” CPU đang cầm trên tay để làm theo.',
+      boxes:['MBR','IR'], beats:[[mv('MBR','IR', st.mbr.ins ? insText(st.mbr.ins) : st.mbr.v)]],
+      apply:x => { x.ir = x.mbr.ins ? x.mbr.ins : null; x.irOk = true; x.sig = '—'; }});
+    case 'D': return M({phase:'D', title: ins ? `Giải mã: đây là lệnh ${ins.op}` : 'Giải mã: không phải một lệnh hợp lệ', sig:'giải mã', ir:'op',
+      text: ins ? `Đơn vị điều khiển (CU) đọc mã lệnh ${ins.op} và hiểu: ${MEANING[ins.op]}. Từ đây CU biết cần làm những bước nào ở pha thực thi.`
+        : 'CU không hiểu nội dung này vì nó là dữ liệu, không phải lệnh. Có thể chương trình đã chạy tràn vào vùng dữ liệu (thiếu HLT hoặc nhảy sai). CU dừng CPU.',
+      tip:'Giải mã giống đọc tên món trên phiếu gọi: nhìn mã lệnh là biết bếp phải nấu món nào.',
+      boxes:['IR','CU'], beats:[[mv('IR.CU','CU.IN', ins ? ins.op : '???')]], apply:x => { x.decoded = x.ir ? x.ir.op : '???'; x.sig = 'giải mã'; }});
+    case 'X1': { const m = memOp(ins); return M({phase:'E', title:'Gửi địa chỉ ô nhớ cần dùng sang MAR', ir:ins.d.t === 'mem' ? 'd' : 's',
+      text:`Lệnh ${insText(ins)} cần dùng ô nhớ số ${m.a}${m.lab ? ` (tên ${m.lab})` : ''}. Địa chỉ ${m.a} nằm ngay trong lệnh (IR) nên được chép sang MAR.`,
+      tip:'Đọc hay ghi RAM đều cần hai thanh ghi: MAR cho biết “đi đâu”, MBR cho biết “mang gì”.',
+      boxes:['IR','MAR'], beats:[[mv('IR','MAR', m.a)]], apply:x => { x.mar = memOp(x.ir).a; x.sig = '—'; }}); }
+    case 'X2': { const v = memVal(st, st.mar); return M({phase:'E', title:'Đọc dữ liệu từ RAM vào MBR', sig:'READ',
+      text:`CPU đặt địa chỉ ${st.mar} lên bus địa chỉ và gửi READ. RAM trả nội dung ô nhớ số ${st.mar} (= ${v}) qua bus dữ liệu về MBR.`,
+      bus:readBus(0, String(v)), boxes:['MAR','MBR','CU'], ram:{row:st.mar, mode:'read'},
+      beats:[[bus('ctrl', 'READ'), bus('addr', st.mar), {t:'laser', row:st.mar}], [bus('data', String(v), true)]], wave:{addr:st.mar, data:String(v), ctrl:'READ'},
+      apply:x => { x.mbr = {v:memVal(x, x.mar)}; x.sig = 'READ'; }}); }
+    case 'M1i': return M({phase:'E', title:`Nạp số ${s.v} vào ${d.r}`, ir:'s',
+      text:`Con số ${s.v} nằm sẵn trong lệnh (ô “Nguồn” của IR) nên được chép thẳng vào ${d.r}. ${d.r} đổi từ ${st.reg[d.r]} thành ${s.v}.`,
+      tip:'Đây là “số tức thời” (immediate): giá trị đi kèm ngay trong lệnh nên không cần đọc RAM, lệnh chạy rất nhanh.',
+      boxes:['IR', d.r], beats:[[mv('IR', d.r, s.v)]], apply:x => { x.reg[d.r] = s.v; x.sig = '—'; }});
+    case 'M1r': return M({phase:'E', title:`Sao chép ${s.r} sang ${d.r}`, ir:'s',
+      text:`Giá trị của ${s.r} (= ${st.reg[s.r]}) được chép sang ${d.r}. ${s.r} vẫn giữ nguyên: MOV là sao chép chứ không phải di chuyển.`,
+      tip:'Giống chụp ảnh tài liệu: bản gốc vẫn còn, ${d.r} chỉ có thêm một bản sao.'.replace('${d.r}', d.r),
+      boxes:[s.r, d.r], beats:[[mv(s.r, d.r, st.reg[s.r])]], apply:x => { x.reg[d.r] = x.reg[s.r]; x.sig = '—'; }});
+    case 'M3': return M({phase:'E', title:`Chép dữ liệu từ MBR vào ${d.r}`,
+      text:`Giá trị ${st.mbr.v} vừa đọc từ RAM đang nằm ở MBR. Nó được chép vào ${d.r}, ${d.r} đổi từ ${st.reg[d.r]} thành ${st.mbr.v}.`,
+      boxes:['MBR', d.r], beats:[[mv('MBR', d.r, st.mbr.v)]], apply:x => { x.reg[d.r] = x.mbr.v; x.sig = '—'; }});
+    case 'S2': return M({phase:'E', title:`Đặt giá trị của ${s.r} vào MBR`,
+      text:`Muốn ghi ra RAM, trước hết phải đặt giá trị cần ghi (${s.r} = ${st.reg[s.r]}) vào MBR, vì MBR là cầu nối duy nhất tới bus dữ liệu.`,
+      boxes:[s.r, 'MBR'], beats:[[mv(s.r, 'MBR', st.reg[s.r])]], apply:x => { x.mbr = {v:x.reg[s.r]}; x.sig = '—'; }});
+    case 'S3': return M({phase:'E', title:'Ghi MBR vào ô nhớ RAM', sig:'WRITE',
+      text:`CPU đặt địa chỉ ${st.mar} lên bus địa chỉ, đặt giá trị ${st.mbr.v} lên bus dữ liệu và gửi tín hiệu WRITE. RAM ghi ${st.mbr.v} vào ô nhớ số ${st.mar}.`,
+      tip:'Khác với đọc, lần này dữ liệu chạy từ CPU ra RAM nên mũi tên bus dữ liệu đảo chiều.',
+      bus:{a:`${st.mar}`, d:`${st.mbr.v}`, c:'WRITE'}, boxes:['MAR','MBR','CU'], ram:{row:st.mar, mode:'write'},
+      beats:[[bus('ctrl', 'WRITE'), bus('addr', st.mar), {t:'laser', row:st.mar}], [bus('data', String(st.mbr.v))]], wave:{addr:st.mar, data:String(st.mbr.v), ctrl:'WRITE'},
+      apply:x => { const old = x.mem[x.mar]; x.mem[x.mar] = {k:'d', v:x.mbr.v, lab:old.lab || null}; x.sig = 'WRITE'; }});
+    case 'A1': { const unary = ins.op === 'INC' || ins.op === 'DEC', a = st.reg[d.r];
+      const r = unary ? alu(ins.op === 'INC' ? '+' : '−', a, 1) : null, sym = ins.op === 'INC' || ins.op === 'ADD' ? '+' : '−';
+      return M({phase:'E', title: unary ? `Đưa ${d.r} vào ALU để ${ins.op === 'INC' ? 'tăng' : 'giảm'} 1` : `Đưa ${d.r} vào đầu vào A của ALU`, sig:`ALU: ${sym}`, ir:'d',
+        text: unary ? `ALU nhận ${d.r} = ${a} và tính ${a} ${sym} 1 = ${r.res}. ALU chỉ tính, chưa ghi vào đâu cả.` : `ALU cần hai số để tính. Số thứ nhất là ${d.r} = ${a} được đưa vào đầu vào A.`,
+        tip:'ALU giống máy tính bỏ túi: nó chỉ tính khi đã có đủ số, rồi giữ kết quả để chờ ghi lại.',
+        boxes:[d.r, 'ALU', 'CU'], beats:unary ? [[mv(d.r, 'ALU.A', a)], [{t:'calc'}]] : [[mv(d.r, 'ALU.A', a)]],
+        aluPrev: unary ? {x:`${a} ${sym} 1`, r:r.res} : {x:`${a} ${sym} ?`, r:''},
+        apply:x => { x.alu = unary ? {a, b:1, op:sym, res:r.res, f:r.f, keepC:true} : {a, b:null, op:sym, res:null}; x.sig = `ALU: ${sym}`; }}); }
+    case 'A2i': case 'A2r': case 'A2m': {
+      const sym = ins.op === 'ADD' ? '+' : '−', a = st.alu.a, b = id === 'A2i' ? s.v : id === 'A2r' ? st.reg[s.r] : st.mbr.v, r = alu(sym, a, b);
+      const label = id === 'A2i' ? `số ${b} trong lệnh` : id === 'A2r' ? `${s.r} = ${b}` : `giá trị ${b} đọc từ RAM`;
+      return M({phase:'E', title:`Đưa ${label} vào ALU và tính`, sig:`ALU: ${sym}`, ir:id === 'A2i' ? 's' : null,
+        text:`Số thứ hai (${label}) được đưa vào đầu vào B. ALU tính ${a} ${sym} ${b} = ${r.res}${r.res >= 32768 ? ` (nếu hiểu là số có dấu: ${sgn16(r.res)})` : ''}. ALU cũng ghi nhận các đặc điểm của kết quả để báo qua cờ.`,
+        boxes:[id === 'A2i' ? 'IR' : id === 'A2r' ? s.r : 'MBR', 'ALU', 'CU'],
+        beats:[[mv(id === 'A2i' ? 'IR' : id === 'A2r' ? s.r : 'MBR', 'ALU.B', b)], [{t:'calc'}]], aluPrev:{x:`${a} ${sym} ${b}`, r:r.res},
+        apply:x => { x.alu = {a:x.alu.a, b, op:sym, res:r.res, f:r.f, keepC:false}; x.sig = `ALU: ${sym}`; }}); }
+    case 'A3': return M({phase:'E', title:`Ghi kết quả của ALU vào ${d.r}`,
+      text:`Kết quả ${st.alu.res} từ ALU được ghi vào ${d.r}. ${d.r} đổi từ ${st.reg[d.r]} thành ${st.alu.res}.`,
+      boxes:['ALU', d.r], beats:[[mv('ALU.OUT', d.r, st.alu.res)]], apply:x => { x.reg[d.r] = x.alu.res; x.sig = '—'; }});
+    case 'A4': { const f = st.alu.f, cmp = ins.op === 'CMP', keep = st.alu.keepC, cNew = keep ? st.f.c : f.c;
+      return M({phase:'E', title:'Cập nhật các cờ trong FLAGS',
+        text:`ALU báo kết quả qua các cờ: ZF=${f.z} (kết quả ${f.z ? 'bằng' : 'khác'} 0), SF=${f.s} (${f.s ? 'âm' : 'không âm'}), CF=${cNew}${keep ? ' (INC/DEC không đụng tới CF)' : f.c ? (ins.op === 'ADD' ? ' (có nhớ ra)' : ' (có mượn)') : ''}, OF=${f.o}.` +
+          (cmp ? ' CMP chỉ so sánh: kết quả bị bỏ đi, chỉ có cờ được giữ lại.' : '') + ' Các lệnh nhảy có điều kiện sẽ đọc những cờ này.',
+        tip:'Cờ giống đèn báo: lệnh sau chỉ cần nhìn đèn để quyết định, không phải tính lại.',
+        boxes:['ALU','FLAGS'], beats:[[mv('ALU.FL','FLAGS.IN', `Z${f.z} S${f.s} C${cNew}`)]],
+        apply:x => { x.f = {z:f.z, s:f.s, c:cNew, o:f.o}; x.sig = '—'; }}); }
+    case 'J1': { const op = ins.op, F = st.f;
+      const take = op === 'JMP' || (op === 'JE' && F.z) || (op === 'JNE' && !F.z) || (op === 'JA' && !F.c && !F.z) || (op === 'JB' && F.c);
+      const cond = {JMP:'không điều kiện', JE:`ZF = ${F.z}`, JNE:`ZF = ${F.z}`, JA:`CF = ${F.c} và ZF = ${F.z}`, JB:`CF = ${F.c}`}[op];
+      return M({phase:'E', rtl: take ? 'PC ← IR(đích)' : 'Không nhảy', pred: take ? 'PC ← IR(đích)' : 'Không nhảy, PC giữ nguyên', ir:'d', sig: op === 'JMP' ? '—' : 'xét cờ',
+        title: take ? `Nhảy tới ô nhớ ${ins.tgt}` : 'Điều kiện sai: không nhảy',
+        text: (op === 'JMP' ? `JMP luôn nhảy: ` : `CU kiểm tra cờ (${cond}). `) + (take ? `Điều kiện thỏa nên địa chỉ đích ${ins.tgt} được ghi đè vào PC. Lần nạp lệnh sau sẽ lấy lệnh ở ô nhớ ${ins.tgt}.` : `Điều kiện không thỏa nên PC giữ nguyên (đang trỏ lệnh ngay bên dưới), chương trình chạy tiếp tuần tự.`),
+        tip: take ? 'Nhảy nghĩa là “nhấc ngón tay PC lên và đặt sang dòng khác”.' : '',
+        boxes: take ? ['FLAGS','IR','PC','CU'] : ['FLAGS','CU'], beats: take ? [[mv('IR', 'PC', ins.tgt)]] : [[{t:'pulse', at:'FLAGS'}]],
+        apply:x => { if (take) x.pc = x.ir.tgt; x.sig = op === 'JMP' ? '—' : 'xét cờ'; }}); }
+    case 'L1': { const cx = st.reg.CX;
+      return M({phase:'E', title:'LOOP giảm CX đi 1',
+        text:`LOOP trước hết giảm bộ đếm: CX đổi từ ${cx} thành ${(cx - 1) & 0xFFFF}.`, tip:'CX là “bộ đếm số vòng”. Mỗi vòng trừ 1, về 0 thì dừng lặp.',
+        boxes:['CX','CU'], beats:[[{t:'float', at:'CX', text:'−1'}]], apply:x => { x.reg.CX = (x.reg.CX - 1) & 0xFFFF; x.sig = '—'; }}); }
+    case 'L2': { const cx = st.reg.CX, take = cx !== 0;
+      return M({phase:'E', rtl: take ? 'PC ← IR(đích)' : 'Không nhảy', pred: take ? 'PC ← IR(đích)' : 'Không nhảy, PC giữ nguyên', ir:'d', sig:'xét CX',
+        title: take ? `CX = ${cx} ≠ 0: quay lại nhãn` : 'CX = 0: thoát vòng lặp',
+        text: take ? `CX vẫn khác 0 nên LOOP nhảy: PC ← ${ins.tgt}, và các lệnh trong vòng lặp được chạy lại.` : 'CX đã về 0 nên LOOP không nhảy nữa, PC giữ nguyên và chương trình đi tiếp xuống dưới.',
+        boxes: take ? ['CX','IR','PC','CU'] : ['CX','CU'], beats: take ? [[mv('IR', 'PC', ins.tgt)]] : [[{t:'pulse', at:'CX'}]],
+        apply:x => { if (take) x.pc = x.ir.tgt; x.sig = 'xét CX'; }}); }
+    default: return M({phase:'E', rtl:'Dừng CPU (HLT)', pred:'Dừng CPU (HLT)', title: ins ? 'Dừng CPU' : 'Dừng vì không hiểu lệnh', sig:'HALT',
+      text: ins ? 'Lệnh HLT làm CU ngừng chạy. Chương trình kết thúc và kết quả nằm trong các thanh ghi / ô nhớ.' : 'CU không hiểu nội dung này nên dừng CPU.',
+      boxes:['CU'], beats:[[{t:'pulse', at:'CU'}]], apply:x => { x.halted = true; x.sig = 'HALT'; }});
+  }
+}
+
+function runStep(st) {
+  const m = describe(st), s = clone(st), cur = st.stage;
+  m.apply(s); delete m.apply;
+  s.clk++; s.curClk++;
+  const key = s.decoded && OPS.includes(s.decoded) ? s.decoded : 'HLT';
+  s.stage = after(s, cur);
+  if (s.stage === 'F1' || s.halted) {
+    s.instr++; s.stat[key].n++; s.stat[key].clk += s.curClk; s.curClk = 0;
+    if (s.halted) s.stage = 'HALT';
+  }
+  m.changed = []; m.changedBoxes = [];
+  ['pc','mar'].forEach(r => { if (s[r] !== st[r]) { m.changed.push(`${r.toUpperCase()}: ${st[r]} → ${s[r]}`); m.changedBoxes.push(r.toUpperCase()); } });
+  if (JSON.stringify(s.mbr) !== JSON.stringify(st.mbr)) { m.changed.push(`MBR: ${st.mbr ? mbrText(st.mbr) : '—'} → ${mbrText(s.mbr)}`); m.changedBoxes.push('MBR'); }
+  if (s.ir !== st.ir && JSON.stringify(s.ir) !== JSON.stringify(st.ir)) { m.changed.push(`IR: ${insText(s.ir)}`); m.changedBoxes.push('IR'); }
+  REGS.forEach(r => { if (s.reg[r] !== st.reg[r]) { m.changed.push(`${r}: ${st.reg[r]} → ${s.reg[r]}`); m.changedBoxes.push(r); } });
+  if (JSON.stringify(s.f) !== JSON.stringify(st.f)) { m.changed.push(`FLAGS: ZF=${s.f.z} SF=${s.f.s} CF=${s.f.c} OF=${s.f.o}`); m.changedBoxes.push('FLAGS'); }
+  s.mem.forEach((c, i) => { if (c.v !== st.mem[i].v || c.k !== st.mem[i].k) { m.changed.push(`RAM[${i}]: ${st.mem[i].k === 'd' ? st.mem[i].v : '?'} → ${c.v}`); m.ramChanged = i; } });
+  if (JSON.stringify(s.alu) !== JSON.stringify(st.alu)) m.changedBoxes.push('ALU');
+  if (s.decoded !== st.decoded || s.sig !== st.sig) m.changedBoxes.push('CU');
+  m.n = s.clk; m.insAddr = s.curAddr;
+  return {meta:m, state:s};
+}
+const mbrText = m => !m ? '—' : m.ins ? insText(m.ins) : String(m.v);
+
+/* =====================================================================
+   3. Dựng sơ đồ SVG
+   ===================================================================== */
+const BX = {
+  PC:{x:430, y:80, w:200, h:84, pill:'PC', sub:'Con trỏ lệnh (IP trong 8086)', cat:'fetch'},
+  MAR:{x:430, y:190, w:200, h:84, pill:'MAR', sub:'Thanh ghi địa chỉ bộ nhớ', cat:'fetch'},
+  MBR:{x:430, y:300, w:200, h:84, pill:'MBR', sub:'Thanh ghi đệm dữ liệu', cat:'fetch'},
+  IR:{x:430, y:410, w:200, h:112, pill:'IR', sub:'Thanh ghi lệnh', cat:'fetch'},
+  CU:{x:430, y:552, w:200, h:122, pill:'CU', sub:'Đơn vị điều khiển', cat:'cu'},
+  AX:{x:750, y:80, w:210, h:84, pill:'AX', sub:'Thanh ghi đa năng', cat:'gen'},
+  BX:{x:750, y:190, w:210, h:84, pill:'BX', sub:'Thanh ghi đa năng', cat:'gen'},
+  CX:{x:750, y:300, w:210, h:84, pill:'CX', sub:'Thanh ghi đếm vòng lặp', cat:'gen'},
+  DX:{x:750, y:424, w:210, h:84, pill:'DX', sub:'Thanh ghi đa năng', cat:'gen'},
+  ALU:{x:750, y:520, w:210, h:130, cat:'alu'},
+  FLAGS:{x:750, y:672, w:210, h:100, pill:'FLAGS', sub:'Thanh ghi cờ', cat:'flag'}
+};
+const PORT = {PC:[630,122], MAR:[630,232], MBR:[630,342], IR:[630,466], AX:[750,122], BX:[750,232], CX:[750,342], DX:[750,466],
+  'ALU.A':[753,555], 'ALU.B':[753,590], 'ALU.OUT':[753,625], 'ALU.FL':[855,650], 'FLAGS.IN':[855,672], 'IR.CU':[530,522], 'CU.IN':[530,552]};
+const DIRECT = new Set(['ALU.FL','FLAGS.IN','IR.CU','CU.IN']);
+const IBUS_X = 690;
+const MEMBUS = {addr:'M430 232 L286 232', data:'M430 342 L286 342', ctrl:'M430 612 L286 612'};
+const BUSCOL = {addr:'var(--a)', data:'var(--d)', ctrl:'var(--c)', int:'var(--accent)'};
+const RAMG = {x:64, y:44, w:222, row0:100, rh:40};
+
+function buildSvg() {
+  const rowY = i => RAMG.row0 + i * RAMG.rh;
+  let h = `<defs><filter id="soft" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="3.5" flood-opacity=".13"/></filter></defs>
+  <rect class="cpu-frame" x="404" y="18" width="598" height="762" rx="24"/>
+  <text class="cpu-label" x="426" y="52">CPU</text>
+  <g id="clk"><circle class="clk-led" id="clkLed" cx="770" cy="46" r="8"/><text class="clk-t" x="786" y="51">CLK</text><text class="clk-n" id="clkN" x="826" y="51">chu kỳ 0</text></g>
+  <rect class="ibus" x="${IBUS_X - 6}" y="74" width="12" height="568" rx="6"/>
+  <text class="ibus-t" x="${IBUS_X}" y="66" text-anchor="middle">BUS TRONG</text>`;
+  [122,232,342,466].forEach(y => h += `<path class="stub" d="M630 ${y} L${IBUS_X} ${y}"/>`);
+  [122,232,342,466].forEach(y => h += `<path class="stub" d="M${IBUS_X} ${y} L750 ${y}"/>`);
+  [555,590,625].forEach(y => h += `<path class="stub thin" d="M${IBUS_X} ${y} L753 ${y}"/>`);
+  h += `<path class="stub thin" d="M855 640 L855 672"/><path class="stub thin" d="M530 522 L530 552"/>`;
+  // bus ngoài
+  const bl = {addr:['a','BUS ĐỊA CHỈ','CPU → RAM (4 dây)',216,252], data:['d','BUS DỮ LIỆU','hai chiều',326,362], ctrl:['c','BUS ĐIỀU KHIỂN','READ · WRITE',596,632]};
+  for (const k in MEMBUS) { const [c, t, n, ty, ny] = bl[k]; h += `<path class="bus ${c}" id="w-${k}" d="${MEMBUS[k]}"/><text class="buslbl ${c}" x="358" y="${ty}">${t}</text><text class="busnote" x="358" y="${ny}">${n}</text>`; }
+  // hộp thanh ghi chuẩn
+  const std = id => { const b = BX[id], pw = 16 + b.pill.length * 9;
+    return `<g class="box cat-${b.cat}" id="box-${id}"><rect class="bg" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="14" filter="url(#soft)"/>
+      <rect class="pill" x="${b.x + 10}" y="${b.y + 9}" width="${pw}" height="22" rx="11"/><text class="pill-t" x="${b.x + 10 + pw / 2}" y="${b.y + 25}">${b.pill}</text>
+      <text class="s" x="${b.x + 12}" y="${b.y + 48}">${b.sub}</text>
+      <text class="v" id="v-${id}" x="${b.x + 12}" y="${b.y + 76}">0</text><text class="h" id="h-${id}" x="${b.x + b.w - 12}" y="${b.y + 76}" text-anchor="end"></text></g>`; };
+  ['PC','MAR','MBR','AX','BX','CX','DX'].forEach(id => h += std(id));
+  // IR
+  const ir = BX.IR, cw = 56, cx0 = ir.x + 12;
+  h += `<g class="box cat-fetch" id="box-IR"><rect class="bg" x="${ir.x}" y="${ir.y}" width="${ir.w}" height="${ir.h}" rx="14" filter="url(#soft)"/>
+    <rect class="pill" x="${ir.x + 10}" y="${ir.y + 9}" width="34" height="22" rx="11"/><text class="pill-t" x="${ir.x + 27}" y="${ir.y + 25}">IR</text><text class="s" x="${ir.x + 52}" y="${ir.y + 25}">Thanh ghi lệnh</text>`;
+  ['Mã lệnh','Đích','Nguồn'].forEach((lb, i) => { const x = cx0 + i * (cw + 6);
+    h += `<text class="lbl" x="${x + cw / 2}" y="${ir.y + 52}" text-anchor="middle">${lb}</text><rect class="cell" id="ircell-${i}" x="${x}" y="${ir.y + 58}" width="${cw}" height="42" rx="9"/><text class="fv" id="v-IR${i}" x="${x + cw / 2}" y="${ir.y + 85}" text-anchor="middle">—</text>`; });
+  h += `</g>`;
+  // CU
+  const cu = BX.CU;
+  h += `<g class="box cat-cu" id="box-CU"><rect class="bg" x="${cu.x}" y="${cu.y}" width="${cu.w}" height="${cu.h}" rx="14" filter="url(#soft)"/>
+    <rect class="pill" x="${cu.x + 10}" y="${cu.y + 9}" width="34" height="22" rx="11"/><text class="pill-t" x="${cu.x + 27}" y="${cu.y + 25}">CU</text><text class="s" x="${cu.x + 12}" y="${cu.y + 48}">Đơn vị điều khiển</text>
+    <text class="gear" x="${cu.x + cu.w - 42}" y="${cu.y + 40}">⚙</text>
+    <text class="lbl" x="${cu.x + 12}" y="${cu.y + 72}">Lệnh đã hiểu</text><text class="fv" id="v-CUop" x="${cu.x + 12}" y="${cu.y + 94}" style="font-size:19px">—</text>
+    <text class="lbl" x="${cu.x + 12}" y="${cu.y + 113}">Tín hiệu:</text><text class="h" id="v-CUsig" x="${cu.x + 66}" y="${cu.y + 113}" style="font-weight:700">—</text></g>`;
+  // ALU
+  h += `<g class="box cat-alu" id="box-ALU"><polygon class="alu-shape" points="750,520 845,520 855,545 865,520 960,520 934,650 776,650" filter="url(#soft)" stroke-linejoin="round"/>
+    <rect class="pill" x="772" y="526" width="48" height="22" rx="11" style="fill:var(--c-alu)"/><text class="pill-t" x="796" y="542">ALU</text>
+    <text class="lbl" x="760" y="559">A</text><text class="lbl" x="760" y="594">B</text><text class="lbl" x="760" y="629">KQ</text>
+    <text class="alu-x" id="v-ALUx" x="860" y="595">—</text><text class="alu-r" id="v-ALUr" x="860" y="628"></text></g>`;
+  // FLAGS
+  const fl = BX.FLAGS;
+  h += `<g class="box cat-flag" id="box-FLAGS"><rect class="bg" x="${fl.x}" y="${fl.y}" width="${fl.w}" height="${fl.h}" rx="14" filter="url(#soft)"/>
+    <rect class="pill" x="${fl.x + 10}" y="${fl.y + 9}" width="64" height="22" rx="11"/><text class="pill-t" x="${fl.x + 42}" y="${fl.y + 25}">FLAGS</text><text class="s" x="${fl.x + 84}" y="${fl.y + 25}">Thanh ghi cờ</text>`;
+  [['z','ZF','=0?'],['s','SF','âm?'],['c','CF','nhớ?'],['o','OF','tràn?']].forEach(([k, n, nt], i) => { const cx = fl.x + 32 + i * 49;
+    h += `<circle class="lamp" id="lamp-${k}" cx="${cx}" cy="${fl.y + 56}" r="14"/><text class="lamp-t" id="lt-${k}" x="${cx}" y="${fl.y + 61}">0</text><text class="lbl" x="${cx}" y="${fl.y + 88}" text-anchor="middle">${n} ${nt}</text>`; });
+  h += `</g>`;
+  // RAM
+  h += `<g id="ram"><rect class="ram-bg" x="${RAMG.x}" y="${RAMG.y}" width="${RAMG.w}" height="${RAMG.row0 - RAMG.y + 16 * RAMG.rh + 8}" rx="16" filter="url(#soft)"/>
+    <text class="ramtitle" x="${RAMG.x + 14}" y="${RAMG.y + 24}">RAM · Bộ nhớ chính</text><text class="ramsub" x="${RAMG.x + 14}" y="${RAMG.y + 42}">Địa chỉ · nội dung</text>`;
+  for (let i = 0; i < 16; i++) { const y = rowY(i);
+    h += `<g class="row" id="row-${i}"><rect x="${RAMG.x + 8}" y="${y - 2}" width="${RAMG.w - 16}" height="${RAMG.rh - 5}" rx="8"/>
+      <text class="ad" x="${RAMG.x + 20}" y="${y + 21}">${i}</text><text class="tx" id="rt-${i}" x="${RAMG.x + 48}" y="${y + 21}"></text><text class="tg" id="rg-${i}" x="${RAMG.x + RAMG.w - 18}" y="${y + 20}"></text></g>`; }
+  h += `<g class="ptr ptr-mar" id="ptrMar"><rect x="${RAMG.x + 5}" y="${RAMG.row0 - 5}" width="${RAMG.w - 10}" height="${RAMG.rh - 2}" rx="10"/><text x="${RAMG.x + RAMG.w - 12}" y="${RAMG.row0 + RAMG.rh - 8}" style="display:none"></text></g>`;
+  h += `<g class="ptr ptr-pc" id="ptrPc"><rect x="${RAMG.x - 60}" y="${RAMG.row0 + 5}" width="54" height="24" rx="12"/><text x="${RAMG.x - 33}" y="${RAMG.row0 + 22}">PC ▶</text></g>`;
+  h += `<text class="ramsub" x="${RAMG.x + RAMG.w / 2}" y="${RAMG.row0 + 16 * RAMG.rh + 22}" text-anchor="middle" style="opacity:0"> </text></g>`;
+  h += `<g id="layerR"></g><g id="layerT"></g>`;
+  $('#svg').innerHTML = h;
+}
+const rowY = i => RAMG.row0 + i * RAMG.rh;
+
+/* =====================================================================
+   4. Hiển thị trạng thái
+   ===================================================================== */
+const setT = (id, v, pop) => {
+  const e = $('#' + id); if (!e) return; v = String(v);
+  if (e.textContent !== v) {
+    e.textContent = v;
+    if (pop && !calm) { e.classList.remove('pop'); void e.getBoundingClientRect(); e.classList.add('pop'); }
+  }
+};
+function renderValues(st, meta) {
+  const ch = new Set(meta ? meta.changedBoxes : []), P = id => ch.has(id);
+  setT('v-PC', st.pc, P('PC')); setT('h-PC', 'bin ' + bin4(st.pc));
+  setT('v-MAR', st.mar, P('MAR')); setT('h-MAR', 'bin ' + bin4(st.mar));
+  const mt = st.mbr ? mbrText(st.mbr) : '0'; setT('v-MBR', mt, P('MBR')); $('#v-MBR').style.fontSize = mt.length > 9 ? '15px' : mt.length > 6 ? '19px' : '27px';
+  setT('h-MBR', st.mbr && !st.mbr.ins ? hex4(st.mbr.v) : '');
+  REGS.forEach(r => { setT('v-' + r, st.reg[r], P(r)); setT('h-' + r, hex4(st.reg[r]) + (st.reg[r] >= 32768 ? `  (${sgn16(st.reg[r])})` : '')); });
+  const i = st.irOk ? st.ir : null;
+  const f0 = i ? i.op : '—', f1 = !i ? '—' : i.tgt !== undefined ? (i.lab || i.tgt) : i.d ? opText(i.d) : '', f2 = !i ? '—' : i.s ? opText(i.s) : '';
+  [f0, f1, f2].forEach((t, k) => { setT('v-IR' + k, t, k === 0 ? P('IR') : P('IR')); $('#v-IR' + k).style.fontSize = String(t).length > 5 ? '13px' : '16px'; });
+  setT('v-CUop', st.decoded || '—', P('CU')); setT('v-CUsig', st.sig || '—');
+  ['z','s','c','o'].forEach(k => { const on = st.f[k]; $('#lamp-' + k).classList.toggle('on', !!on); setT('lt-' + k, on); });
+  const a = st.alu, pv = meta && meta.aluPrev;
+  if (a && a.res != null) { setT('v-ALUx', `${a.a == null ? '' : a.a + ' ' + a.op + ' '}${a.b}`, P('ALU')); setT('v-ALUr', '= ' + a.res, P('ALU')); }
+  else if (a) { setT('v-ALUx', `${a.a} ${a.op} ?`, P('ALU')); setT('v-ALUr', ''); }
+  else { setT('v-ALUx', '—'); setT('v-ALUr', ''); }
+  for (let k = 0; k < 16; k++) {
+    const c = st.mem[k], row = $('#row-' + k);
+    row.classList.toggle('c', c.k === 'c'); row.classList.toggle('d', c.k === 'd');
+    const rm = meta && meta.ram && meta.ram.row === k ? meta.ram.mode : '';
+    row.classList.toggle('read', rm === 'read'); row.classList.toggle('write', rm === 'write');
+    setT('rt-' + k, c.k === 'c' ? insText(c.ins) : c.k === 'd' ? (c.lab ? c.lab + ' = ' : '') + c.v : '·');
+    setT('rg-' + k, c.k === 'c' ? 'LỆNH' : c.k === 'd' ? 'DỮ LIỆU' : '');
+  }
+  $('#ptrPc').style.transform = `translate(0,${st.pc * RAMG.rh}px)`;
+  $('#ptrMar').style.transform = `translate(0,${st.mar * RAMG.rh}px)`;
+  $('#ptrPc').style.opacity = st.halted ? .35 : 1;
+}
+function highlight(meta) {
+  $$('#svg .active').forEach(e => e.classList.remove('active'));
+  $('#svg').classList.toggle('focus', !!meta);
+  if (!meta) return;
+  meta.boxes.forEach(b => $('#box-' + b)?.classList.add('active'));
+  if (meta.ram) $('#ram').classList.add('active');
+  $$('#svg .cell.on').forEach(e => e.classList.remove('on'));
+  if (meta.ir) { const k = {op:0, d:1, s:2}[meta.ir]; $('#ircell-' + k)?.classList.add('on'); }
+}
+
+/* ---------- bộ máy chuyển động ---------- */
+let token = 0, speed = 1;
+const wait = ms => new Promise(r => setTimeout(r, ms / speed));
+const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+function tween(dur, fn, tk) {
+  return new Promise(res => {
+    if (calm) { fn(1); return res(true); }
+    const t0 = performance.now();
+    const f = now => { if (tk !== token) return res(false); const t = Math.min(1, (now - t0) / dur); fn(ease(t)); t < 1 ? requestAnimationFrame(f) : res(true); };
+    requestAnimationFrame(f);
+  });
+}
+const boxC = id => { const b = BX[id]; return [b.x + b.w / 2, b.y + b.h / 2]; };
+function routePts(a, b) {
+  const p1 = PORT[a], p2 = PORT[b];
+  if (DIRECT.has(a) || DIRECT.has(b) || p1[1] === p2[1]) return p1[1] === p2[1] && !DIRECT.has(a) && !DIRECT.has(b) ? [p1, p2] : [p1, p2];
+  return [p1, [IBUS_X, p1[1]], [IBUS_X, p2[1]], p2];
+}
+const ptsD = pts => 'M' + pts.map(p => p.join(' ')).join(' L');
+function ripple(x, y, col, tk) {
+  const c = mk('circle', {cx:x, cy:y, r:6, class:'ring', stroke:col}, $('#layerT'));
+  return tween(650 / speed, e => { c.setAttribute('r', 6 + 34 * e); c.setAttribute('opacity', 1 - e); }, tk).then(() => c.remove());
+}
+function makeToken(text, col) {
+  const t = String(text), w = Math.max(40, t.length * 8.8 + 20);
+  const g = mk('g', {class:'packet'}, $('#layerT'));
+  mk('rect', {x:-w / 2, y:-14, width:w, height:28, rx:14, fill:col}, g);
+  const tx = mk('text', {y:5}, g); tx.textContent = t;
+  return g;
+}
+async function doMove(b, tk) {
+  const pts = routePts(b.from, b.to), col = BUSCOL.int;
+  const route = mk('path', {d:ptsD(pts), class:'route', stroke:col}, $('#layerR')), L = route.getTotalLength();
+  route.style.strokeDasharray = L; route.style.strokeDashoffset = L;
+  ripple(pts[0][0], pts[0][1], col, tk);
+  const g = makeToken(b.text, col);
+  const ok = await tween(Math.max(650, L * 2.8) / speed, e => {
+    const p = route.getPointAtLength(e * L); g.setAttribute('transform', `translate(${p.x},${p.y})`); route.style.strokeDashoffset = L * (1 - e);
+  }, tk);
+  if (ok) { const last = pts[pts.length - 1]; ripple(last[0], last[1], col, tk); route.style.opacity = .25; await wait(120); }
+  g.remove(); route.remove();
+  return ok;
+}
+async function doBus(b, tk) {
+  const path = $('#w-' + b.bus), L = path.getTotalLength(), col = BUSCOL[b.bus];
+  path.classList.add('active');
+  const g = makeToken(b.text, col);
+  const ok = await tween(Math.max(650, L * 3.4) / speed, e => { const p = path.getPointAtLength((b.rev ? 1 - e : e) * L); g.setAttribute('transform', `translate(${p.x},${p.y})`); }, tk);
+  g.remove();
+  return ok;
+}
+async function doFloat(b, tk) {
+  const [x, y] = boxC(b.at), col = BUSCOL.int;
+  const t = mk('text', {class:'floatT', x:x + 40, y:BX[b.at].y + 30, fill:col}, $('#layerT')); t.textContent = b.text;
+  ripple(x, y, col, tk);
+  const ok = await tween(900 / speed, e => { t.setAttribute('y', BX[b.at].y + 30 - 34 * e); t.setAttribute('opacity', e < .75 ? 1 : (1 - e) * 4); }, tk);
+  t.remove(); return ok;
+}
+async function doPulse(b, tk) { const [x, y] = boxC(b.at); await ripple(x, y, BUSCOL.int, tk); return tk === token; }
+async function doCalc(b, tk) { const [x, y] = [855, 585]; await Promise.all([ripple(x, y, 'var(--c-alu)', tk), wait(300)]); return tk === token; }
+async function doLaser(b, tk) {
+  const el = $('#ptrMar'); el.style.transform = `translate(0,${b.row * RAMG.rh}px)`;
+  await wait(450); return tk === token;
+}
+async function playBeats(groups, tk, meta) {
+  for (const grp of groups) {
+    if (meta && meta.aluPrev && grp.some(b => b.t === 'calc')) { setT('v-ALUx', meta.aluPrev.x, true); setT('v-ALUr', meta.aluPrev.r === '' ? '' : '= ' + meta.aluPrev.r, true); }
+    const res = await Promise.all(grp.map(b => b.t === 'move' ? doMove(b, tk) : b.t === 'bus' ? doBus(b, tk) : b.t === 'float' ? doFloat(b, tk) : b.t === 'pulse' ? doPulse(b, tk) : b.t === 'calc' ? doCalc(b, tk) : doLaser(b, tk)));
+    $$('#svg .bus.active').forEach(e => e.classList.remove('active'));
+    if (res.includes(false)) return false;
+  }
+  return true;
+}
+function clearLayers() { $('#layerR').innerHTML = ''; $('#layerT').innerHTML = ''; $$('#svg .bus.active').forEach(e => e.classList.remove('active')); }
+
+/* ---------- lời giải thích gõ dần ---------- */
+let typeTk = 0;
+function typeText(el, text, tk) {
+  typeTk++; const my = typeTk;
+  if (calm || speed > 2) { el.textContent = text; return; }
+  el.textContent = '';
+  let i = 0; const per = Math.max(2, Math.ceil(text.length / (45 / Math.min(speed, 2))));
+  const f = () => { if (my !== typeTk) return; i = Math.min(text.length, i + per); el.textContent = text.slice(0, i); if (i < text.length) setTimeout(f, 22); };
+  f();
+}
+
+/* =====================================================================
+   5. Bộ điều khiển
+   ===================================================================== */
+const sim = {hist:[], idx:0, prog:null, busy:false, playing:false, predict:false, score:{ok:0, n:0}, preset:0, vals:{}};
+const cur = () => sim.hist[sim.idx];
+const PHASE_NAME = {F:'NẠP LỆNH', D:'GIẢI MÃ', E:'THỰC THI'};
+
+function loadProgram(src) {
+  const r = assemble(src), box = $('#errors');
+  if (r.errors.length) { box.hidden = false; box.innerHTML = `<b>Chưa nạp được chương trình:</b><ul>${[...new Set(r.errors)].map(e => `<li>${e}</li>`).join('')}</ul>`; return false; }
+  box.hidden = true; sim.prog = r; resetSim(); return true;
+}
+function resetSim() {
+  token++; typeTk++; sim.playing = false; sim.busy = false; sim.score = {ok:0, n:0};
+  sim.hist = [{state:initState(sim.prog), meta:null}]; sim.idx = 0;
+  $('#predictBox').innerHTML = ''; clearLayers(); render(true);
+  if (sim.predict) askPredictSafe();
+}
+function setStepPanel(m, st, animate) {
+  const badge = $('#badge');
+  if (!m) { badge.textContent = st.halted ? 'ĐÃ DỪNG' : 'SẴN SÀNG'; badge.dataset.p = ''; }
+  else { badge.textContent = PHASE_NAME[m.phase]; badge.dataset.p = m.phase; }
+  $$('.phase').forEach(p => p.classList.toggle('on', !!m && p.dataset.p === m.phase));
+  $('#stepNo').textContent = m ? `Chu kỳ clock thứ ${m.n}` : 'Chưa bắt đầu';
+  const tip = $('#tip');
+  if (!m) {
+    $('#rtlTxt').textContent = '—'; $('#stepTitle').textContent = 'Bắt đầu chu kỳ lệnh đầu tiên';
+    typeText($('#stepText'), `PC đang bằng 0 nên lệnh đầu tiên nằm ở ô nhớ số 0. Bấm “Tự chạy” để xem liên tục, hoặc “Tiếp” để đi từng bước. Mỗi lệnh luôn bắt đầu bằng 4 bước nạp lệnh rồi 1 bước giải mã.`);
+    tip.hidden = true; $('#busInfo').innerHTML = ''; $('#changes').innerHTML = '';
+    return;
+  }
+  $('#rtlTxt').textContent = m.rtl; $('#stepTitle').textContent = m.title;
+  if (animate) typeText($('#stepText'), m.text); else { typeTk++; $('#stepText').textContent = m.text; }
+  tip.hidden = !m.tip; tip.innerHTML = m.tip ? `<b>Ví dụ đời thường:</b> ${m.tip}` : '';
+  const b = m.bus;
+  $('#busInfo').innerHTML = b.note && b.a === '—' ? `<li><b>Bus ngoài</b><span>${b.note}</span></li>`
+    : `<li class="a"><b>Bus địa chỉ</b><code>${b.a}</code></li><li class="d"><b>Bus dữ liệu</b><code>${b.d}</code></li><li class="c"><b>Bus điều khiển</b><code>${b.c}</code></li>`;
+  $('#changes').innerHTML = (m.changed || []).map(c => `<span>${c}</span>`).join('');
+}
+function render(noAnim) {
+  const e = cur(), st = e.state, m = e.meta;
+  renderValues(st, m); highlight(m); setStepPanel(m, st, false);
+  $('#stI').textContent = st.instr; $('#stC').textContent = st.clk; $('#stCPI').textContent = st.instr ? (st.clk / st.instr).toFixed(2) : '—';
+  $('#clkN').textContent = `chu kỳ ${st.clk}`; $('#clkLed').classList.toggle('on', st.clk % 2 === 1);
+  renderChips(st); renderListing(st); renderMicroTable(m); renderStats(st); renderWave();
+  const over = st.halted && sim.idx === sim.hist.length - 1;
+  $('#bPrev').disabled = sim.idx === 0 || sim.busy;
+  $('#bNext').disabled = over || sim.busy;
+  $('#bInstr').disabled = over || sim.busy || sim.predict;
+  $('#bHalt').disabled = over || sim.busy || sim.predict;
+  $('#bPlay').disabled = (over && !sim.playing) || sim.predict;
+  $('#bPlay').textContent = sim.playing ? '⏸ Tạm dừng' : '▶ Tự chạy';
+}
+function commitRender() {
+  const e = cur(), st = e.state, m = e.meta;
+  renderValues(st, m);
+  $('#stI').textContent = st.instr; $('#stC').textContent = st.clk; $('#stCPI').textContent = st.instr ? (st.clk / st.instr).toFixed(2) : '—';
+  $('#changes').innerHTML = (m.changed || []).map(c => `<span>${c}</span>`).join('');
+  $('#clkN').textContent = `chu kỳ ${st.clk}`; $('#clkLed').classList.toggle('on', st.clk % 2 === 1);
+  renderChips(st); renderListing(st); renderMicroTable(m); renderStats(st); renderWave(true);
+  const over = st.halted;
+  $('#bPrev').disabled = false; $('#bNext').disabled = over; $('#bInstr').disabled = over || sim.predict; $('#bHalt').disabled = over || sim.predict;
+  $('#bPlay').disabled = (over && !sim.playing) || sim.predict; $('#bPlay').textContent = sim.playing ? '⏸ Tạm dừng' : '▶ Tự chạy';
+}
+
+/* ---------- chip, chương trình ---------- */
+function renderChips(st) {
+  let seq = FETCH.slice(), showLast = false;
+  const decodedYet = !FETCH.slice(0, 5).includes(st.stage) || st.curClk >= 5;
+  if (decodedYet && st.irOk) seq = seq.concat(plan(st.ir));
+  if ((st.stage === 'F1' || st.stage === 'HALT') && st.instr > 0) { seq = FETCH.concat(plan(st.ir)); showLast = true; }
+  const pos = showLast ? seq.length : Math.max(0, seq.indexOf(st.stage));
+  $('#insline').innerHTML = showLast ? `Lệnh vừa hoàn thành: <b>${insText(st.ir)}</b>` : st.irOk && decodedYet ? `Lệnh đang thực hiện: <b>${insText(st.ir)}</b>` : `Lệnh mới đang được nạp từ ô nhớ <b>${st.pc}</b>…`;
+  let h = '';
+  seq.forEach((id, i) => {
+    if (i === 5) h += `<span class="chip sep">│ thực thi</span>`;
+    h += `<span class="chip ${i < pos ? 'done' : i === pos ? 'next' : ''}">${shortOf(id, st.ir)}</span>`;
+  });
+  if (!decodedYet && !showLast) h += `<span class="chip sep">… phần thực thi tùy lệnh</span>`;
+  $('#chips').innerHTML = h;
+}
+function renderListing(st) {
+  const L = sim.prog.listing; const box = $('#listing');
+  const running = st.curAddr >= 0 && st.stage !== 'F1' && st.stage !== 'HALT' ? st.curAddr : (st.stage === 'HALT' ? st.curAddr : -1);
+  box.innerHTML = L.length ? L.map(r => {
+    const c = st.mem[r.addr];
+    const txt = r.kind === 'c' ? insText(c.ins) : r.kind === 'd' ? `${r.label ? r.label : 'DW'} = ${c.v}` : '';
+    const cls = r.kind === 'd' ? 'dat' : '';
+    const now = r.kind === 'c' && r.addr === running, next = r.kind === 'c' && r.addr === st.pc && !running && !st.halted || (r.kind === 'c' && st.stage === 'F1' && r.addr === st.pc && !st.halted);
+    const mark = now ? 'đang chạy' : next ? 'sắp nạp' : '';
+    return `<div class="lrow ${cls} ${now ? 'now' : next ? 'next' : ''}"><span class="la">${r.addr}</span>${r.label && r.kind === 'c' ? `<span class="lb">${r.label}:</span>` : ''}<span class="li">${txt}</span><span class="lc">${r.comment || ''}</span><span class="mark">${mark}</span></div>`;
+  }).join('') : '<div class="lrow empty">Chưa có lệnh nào.</div>';
+}
+
+/* ---------- giản đồ xung nhịp ---------- */
+const WW = 62, WH = 206, PHC = {F:'var(--ph-f)', D:'var(--ph-d)', E:'var(--ph-e)'};
+function buildWaveLabels() {
+  $('#waveLab').innerHTML = `<text x="10" y="52">Xung CLK</text><text x="10" y="107">Bus địa chỉ</text><text x="10" y="147">Bus dữ liệu</text><text x="10" y="187">Điều khiển</text><text x="10" y="18">Lệnh</text>`;
+}
+function renderWave(animLast) {
+  const svg = $('#waveSvg'), entries = [];
+  for (let i = 1; i <= sim.idx; i++) entries.push(i);
+  const shown = entries.slice(-120), W = Math.max(shown.length + 3, 14) * WW;
+  svg.setAttribute('width', W);
+  let h = '';
+  shown.forEach((hi, j) => {
+    const m = sim.hist[hi].meta, x = j * WW, w = m.wave || {}, last = hi === sim.idx;
+    if (last) h += `<rect class="w-cur" x="${x}" y="0" width="${WW}" height="${WH}"/>`;
+    h += `<rect x="${x}" y="22" width="${WW}" height="6" fill="${PHC[m.phase]}"/>`;
+    if (m.id === 'F1') h += `<line x1="${x}" y1="0" x2="${x}" y2="${WH}" stroke="var(--line)" stroke-width="2"/><text class="w-ins" x="${x + 4}" y="15">${w.ins || ''}</text>`;
+    h += `<path class="w-clk ${last && animLast ? 'draw' : ''}" d="M${x} 64 L${x} 38 L${x + WW / 2} 38 L${x + WW / 2} 64 L${x + WW} 64"/>`;
+    const barRow = (y, col, txt, cls) => txt != null && txt !== ''
+      ? `<g><title>${txt}</title><rect class="w-bar ${last && animLast ? 'new' : ''}" x="${x + 3}" y="${y}" width="${WW - 6}" height="26" rx="8" fill="${col}"/><text class="w-t" x="${x + WW / 2}" y="${y + 17}">${String(txt).length > 7 ? String(txt).slice(0, 6) + '…' : txt}</text></g>`
+      : `<line class="w-idle" x1="${x}" y1="${y + 13}" x2="${x + WW}" y2="${y + 13}"/>`;
+    h += barRow(82, 'var(--a)', w.addr != null ? w.addr : null) + barRow(122, 'var(--d)', w.data != null ? w.data : null) + barRow(162, 'var(--c)', w.ctrl || null);
+    h += `<text class="w-n" x="${x + WW / 2}" y="${WH - 2}">${m.n}</text><rect class="w-hit" x="${x}" y="0" width="${WW}" height="${WH}" data-i="${hi}"><title>${m.rtl}</title></rect>`;
+  });
+  if (!shown.length) h = `<text x="16" y="100" style="font:14px var(--sans);fill:var(--muted)">Chưa có chu kỳ nào. Bấm “Tự chạy” hoặc “Tiếp”, mỗi chu kỳ sẽ vẽ thêm một cột ở đây.</text>`;
+  svg.innerHTML = h;
+  const sc = $('#waveScroll'); sc.scrollLeft = sc.scrollWidth;
+}
+
+/* ---------- tab ---------- */
+const MICRO = [
+  ['grp','NẠP LỆNH · giống nhau với mọi lệnh'],
+  ['F1','1','[MAR] ← [PC]'], ['F2','2','[PC] ← [PC] + 1'], ['F3','3','[MBR] ← [MM[MAR]]'], ['F4','4','[IR] ← [MBR]'], ['D','4a','CU ← [IR(mã lệnh)]'],
+  ['grp','THỰC THI · MOV'],
+  ['M1i','','MOV AX, 5 → [AX] ← [IR(số)]'], ['M1r','','MOV AX, BX → [AX] ← [BX]'],
+  ['X1','5','MOV AX, [x] → [MAR] ← [IR(địa chỉ)]'], ['X2','6','[MBR] ← [MM[MAR]]'], ['M3','8','[AX] ← [MBR]'],
+  ['S2','','MOV [x], AX → [MBR] ← [AX]'], ['S3','','[MM[MAR]] ← [MBR]'],
+  ['grp','THỰC THI · ADD, SUB (CMP bỏ bước 8)'],
+  ['A1','7b','ALU ← [AX]  (số thứ nhất)'], ['A2i','7a','ALU ← [IR(số)] hoặc [BX] hoặc [MBR]  (số thứ hai)'], ['A3','8','[AX] ← ALU'], ['A4','9','[FLAGS] ← ALU'],
+  ['grp','THỰC THI · INC, DEC, nhảy, LOOP'],
+  ['J1','','JMP, JE, JNE, JA, JB → [PC] ← [IR(đích)] nếu thỏa điều kiện'],
+  ['L1','','LOOP → [CX] ← [CX] − 1'], ['L2','','nếu CX ≠ 0 thì [PC] ← [IR(đích)]'], ['H1','','HLT → dừng CPU']
+];
+function renderMicroTable(m) {
+  const id = m ? (['A2r','A2m'].includes(m.id) ? 'A2i' : m.id) : '';
+  $('#microTable').innerHTML = `<tr><th>Số</th><th>Vi thao tác</th></tr>` + MICRO.map(r => r[0] === 'grp' ? `<tr class="grp"><td colspan="2">${r[1]}</td></tr>`
+    : `<tr class="${r[0] === id ? 'now' : ''}"><td class="m">${r[1] || '·'}</td><td class="m">${r[2]}</td></tr>`).join('');
+}
+function renderIsa() {
+  $('#isaTable').innerHTML = `<tr><th>Lệnh</th><th>Tác dụng</th></tr>` + OPS.map(o => `<tr><td class="m">${FORMS[o]}</td><td>${MEANING[o][0].toUpperCase() + MEANING[o].slice(1)}</td></tr>`).join('');
+}
+function renderStats(st) {
+  const rows = OPS.map(o => { const s = st.stat[o]; return `<tr><td class="m">${o}</td><td class="m">${s.n}</td><td class="m">${s.n ? (s.clk / s.n).toFixed(1) : '—'}</td><td class="m">${s.clk}</td></tr>`; }).join('');
+  $('#statTable').innerHTML = `<tr><th>Lệnh</th><th>Số lần chạy</th><th>CPI đo được</th><th>Tổng chu kỳ</th></tr>${rows}
+    <tr class="grp"><td>Tổng</td><td class="m">${st.instr}</td><td class="m">${st.instr ? (st.clk / st.instr).toFixed(2) : '—'}</td><td class="m">${st.clk}</td></tr>`;
+  const f = parseFloat($('#freq').value);
+  if (f > 0) { const T = 1000 / f, t = st.clk * T; $('#timeOut').innerHTML = `Chu kỳ clock T = 1 / f = <b>${T >= 1000 ? (T / 1000).toFixed(2) + ' µs' : T.toFixed(T < 10 ? 2 : 0) + ' ns'}</b> · CPU time = ${st.clk} × T = <b>${t >= 1000 ? (t / 1000).toFixed(2) + ' µs' : t.toFixed(0) + ' ns'}</b>`; }
+}
+
+/* ---------- điều khiển ---------- */
+async function doNext() {
+  if (sim.busy) return false;
+  const e = cur();
+  if (e.state.halted && sim.idx === sim.hist.length - 1) return false;
+  const my = ++token; sim.busy = true;
+  $('#bPrev').disabled = true; $('#bNext').disabled = true;
+  let meta, nextState;
+  if (sim.idx < sim.hist.length - 1) { const n = sim.hist[sim.idx + 1]; meta = n.meta; nextState = n.state; }
+  else { const r = runStep(e.state); meta = r.meta; nextState = r.state; }
+  highlight(meta); setStepPanel(meta, e.state, true);
+  $('#changes').innerHTML = ''; $('#stepNo').textContent = `Chu kỳ clock thứ ${meta.n}`;
+  const ok = await playBeats(meta.beats, my, meta);
+  if (!ok || my !== token) { sim.busy = false; return false; }
+  if (sim.idx === sim.hist.length - 1) {
+    sim.hist.push({state:nextState, meta});
+    if (sim.hist.length > 6000) sim.hist.shift();
+    sim.idx = sim.hist.length - 1;
+  } else sim.idx++;
+  sim.busy = false;
+  commitRender();
+  return true;
+}
+function goTo(i) {
+  token++; typeTk++; sim.playing = false; sim.busy = false; clearLayers(); sim.idx = Math.max(0, Math.min(sim.hist.length - 1, i)); render(true);
+  if (sim.predict && sim.idx === sim.hist.length - 1) askPredictSafe();
+}
+async function playLoop(untilInstrEnd) {
+  if (sim.playing) { sim.playing = false; token++; sim.busy = false; clearLayers(); render(true); return; }
+  sim.playing = true; $('#predictBox').innerHTML = ''; render(true);
+  while (sim.playing) {
+    const ok = await doNext();
+    if (!ok) break;
+    const st = cur().state;
+    if (st.halted) break;
+    if (untilInstrEnd && st.stage === 'F1') break;
+    await wait(420);
+  }
+  sim.playing = false; $('#bPlay').textContent = '▶ Tự chạy'; commitButtons();
+}
+function commitButtons() { const st = cur().state, over = st.halted && sim.idx === sim.hist.length - 1; $('#bPlay').disabled = (over && !sim.playing) || sim.predict; $('#bNext').disabled = over || sim.busy; $('#bPrev').disabled = sim.idx === 0 || sim.busy; $('#bInstr').disabled = over || sim.busy || sim.predict; $('#bHalt').disabled = over || sim.busy || sim.predict; }
+function runToHalt() {
+  token++; typeTk++; sim.playing = false; sim.busy = false; clearLayers();
+  while (sim.idx < sim.hist.length - 1) sim.idx++;
+  let n = 0, st = cur().state, m = cur().meta;
+  while (!st.halted && n < 4000) { const r = runStep(st); sim.hist.push({state:r.state, meta:r.meta}); st = r.state; n++; }
+  if (sim.hist.length > 6000) sim.hist.splice(0, sim.hist.length - 6000);
+  sim.idx = sim.hist.length - 1; render(true);
+  if (!st.halted) $('#stepText').textContent = 'Đã dừng sau 4000 vi thao tác mà chưa gặp HLT. Có thể chương trình đang lặp vô hạn, hãy kiểm tra điều kiện thoát vòng lặp.';
+}
+
+/* ---------- chế độ thử thách ---------- */
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+function askPredict() {
+  const st = cur().state; if (st.halted) return;
+  const m = describe(st), right = m.pred || m.rtl, rg = () => REGS[Math.floor(Math.random() * 4)];
+  const pool = shuffle(['MAR ← PC','PC ← PC + 1','MBR ← MM[MAR]','IR ← MBR','CU ← IR(mã lệnh)','MAR ← IR(địa chỉ)','ALU ← MBR','ALU ← IR(số)','FLAGS ← ALU','MM[MAR] ← MBR', `${rg()} ← IR(số)`, `${rg()} ← ALU`, `ALU ← ${rg()}`, `MBR ← ${rg()}`, 'PC ← MAR', 'IR ← MAR']);
+  const opts = new Set([right]);
+  if (/ ← /.test(right) && !/MM\[/.test(right) && !/\+|−/.test(right)) { const [l, r] = right.split(' ← '); opts.add(`${r.replace(/ nếu.*/, '')} ← ${l}`); }
+  for (const p of pool) { if (opts.size >= 4) break; opts.add(p); }
+  const list = shuffle([...opts]);
+  const prev = cur().meta ? cur().meta.rtl : 'chưa có (bắt đầu lệnh đầu tiên)';
+  const ph = m.phase === 'F' ? 'pha NẠP LỆNH' : m.phase === 'D' ? 'pha GIẢI MÃ' : `pha THỰC THI của lệnh ${st.ir ? insText(st.ir) : '???'}`;
+  const box = $('#predictBox');
+  box.innerHTML = `<div class="card predict"><h3>Bước tiếp theo là gì?</h3><p>Đang ở ${ph}. Bước vừa xong: <code>${prev}</code> · Điểm: ${sim.score.ok}/${sim.score.n}</p>
+    <div class="opts">${list.map(o => `<button class="opt" type="button">${o}</button>`).join('')}</div><div class="fb" id="fb"></div></div>`;
+  let first = true;
+  $$('.opt', box).forEach(b => b.addEventListener('click', async () => {
+    if (b.textContent === right) {
+      b.classList.add('ok'); if (first) sim.score.ok++; sim.score.n += first ? 1 : 0; first = false;
+      $$('.opt', box).forEach(x => x.disabled = true);
+      $('#fb').innerHTML = '<b style="color:var(--ok)">Chính xác!</b> Xem CPU làm bước này…';
+      await new Promise(r => setTimeout(r, 450)); box.innerHTML = ''; await doNext();
+      if (sim.predict) askPredictSafe();
+    } else {
+      b.classList.add('bad'); b.disabled = true; if (first) { sim.score.n++; first = false; }
+      $('#fb').innerHTML = `<b style="color:var(--bad)">Chưa đúng.</b> Gợi ý: ${m.phase === 'F' ? 'mọi lệnh đều bắt đầu bằng việc chép địa chỉ từ PC sang MAR, đọc RAM vào MBR rồi chuyển sang IR' : m.phase === 'D' ? 'CU giải mã mã lệnh lấy từ IR' : 'địa chỉ hoặc số nằm trong IR, dữ liệu đọc từ RAM đi qua MBR, kết quả tính toán đi qua ALU'}.`;
+    }
+  }));
+}
+function askPredictSafe() { if (!sim.busy && !sim.playing && sim.idx === sim.hist.length - 1) askPredict(); }
+function requestNext() {
+  if (sim.busy) return;
+  if (sim.predict && sim.idx === sim.hist.length - 1 && !cur().state.halted) askPredict(); else { $('#predictBox').innerHTML = ''; doNext(); }
+}
+
+/* ---------- kiểm tra trắc nghiệm ---------- */
+const QUIZ = [
+  {q:'PC (Program Counter) chứa thông tin gì?', o:['Địa chỉ của lệnh sẽ thực hiện tiếp theo','Nội dung lệnh đang thực hiện','Kết quả của phép tính gần nhất','Số lần vòng lặp còn lại'], a:0, e:'PC luôn trỏ tới lệnh kế tiếp. Lệnh đang thực hiện nằm trong IR. Trong 8086, PC có tên là IP.'},
+  {q:'MAR có nhiệm vụ gì?', o:['Giữ dữ liệu đọc từ RAM','Giữ địa chỉ ô nhớ cần đọc hoặc ghi','Giải mã mã lệnh','Lưu các cờ'], a:1, e:'MAR đưa địa chỉ lên bus địa chỉ. Dữ liệu đi vào hay ra khỏi RAM luôn dừng ở MBR.'},
+  {q:'Bước đầu tiên của mọi chu kỳ lệnh là gì?', o:['IR ← MBR','PC ← PC + 1','MAR ← PC','AX ← ALU'], a:2, e:'Địa chỉ lệnh trong PC phải được chép sang MAR trước khi truy cập RAM.'},
+  {q:'Vì sao PC được tăng thêm 1 ngay trong pha nạp lệnh?', o:['Để ALU có số để tính','Để PC sẵn sàng trỏ vào lệnh kế tiếp trong khi lệnh hiện tại còn đang xử lý','Để tạo cờ nhớ','Vì mỗi lệnh dài đúng 1 byte'], a:1, e:'Nếu là lệnh nhảy, giá trị PC + 1 sẽ bị ghi đè bằng địa chỉ đích.'},
+  {q:'Bus nào cho biết thao tác là đọc (READ) hay ghi (WRITE)?', o:['Bus địa chỉ','Bus dữ liệu','Bus điều khiển','Bus trong CPU'], a:2, e:'Bus điều khiển mang tín hiệu lệnh như READ, WRITE và tín hiệu thời gian.'},
+  {q:'Lệnh MOV AX, 5 và MOV AX, [x] khác nhau ở điểm nào?', o:['Lệnh thứ nhất phải đọc RAM, lệnh thứ hai thì không','Lệnh thứ nhất có sẵn số 5 trong lệnh nên không cần đọc RAM; lệnh thứ hai phải đọc RAM nên tốn nhiều chu kỳ hơn','Hai lệnh giống hệt nhau','Lệnh thứ hai chỉ dùng được với BX'], a:1, e:'MOV AX, 5 mất 6 chu kỳ, còn MOV AX, [x] mất 8 chu kỳ vì thêm bước đọc RAM.'},
+  {q:'Sau lệnh MOV BX, AX thì AX thế nào?', o:['AX bằng 0','AX giữ nguyên giá trị cũ','AX nhận giá trị của BX','AX bị xóa khỏi RAM'], a:1, e:'MOV là sao chép nên nguồn (AX) không thay đổi.'},
+  {q:'CMP AX, BX làm gì?', o:['Cộng AX và BX rồi lưu vào AX','Trừ AX cho BX, lưu kết quả vào BX','Trừ AX cho BX nhưng bỏ kết quả, chỉ cập nhật cờ','Chép BX vào AX'], a:2, e:'CMP giống SUB nhưng không ghi kết quả; các lệnh JE, JA, JB… đọc cờ để quyết định nhảy.'},
+  {q:'Cờ ZF = 1 cho biết điều gì?', o:['Kết quả là số âm','Phép tính có nhớ ra','Kết quả bằng 0','Vừa có lệnh nhảy'], a:2, e:'ZF (Zero Flag) bằng 1 khi kết quả bằng 0. SF bằng 1 khi kết quả âm.'},
+  {q:'LOOP lap thực hiện việc gì?', o:['Nhảy về lap bất kể điều kiện','Giảm CX đi 1, nếu CX khác 0 thì nhảy về lap','Tăng CX lên 1 rồi nhảy về lap','Dừng chương trình'], a:1, e:'Muốn lặp N lần, đặt CX = N trước vòng lặp.'},
+  {q:'Lệnh ADD AX, [y] tốn 11 chu kỳ còn ADD AX, BX chỉ 9. Vì sao?', o:['Vì RAM có xung nhịp chậm hơn','Vì phải thêm 2 bước: đưa địa chỉ sang MAR và đọc RAM vào MBR','Vì [y] là số âm','Vì ADD AX, BX không cần giải mã'], a:1, e:'Truy cập bộ nhớ luôn thêm các bước MAR ← IR(địa chỉ) và MBR ← MM[MAR]. Đó là lý do CPI phụ thuộc cách đánh địa chỉ.'}
+];
+let qz = {i:0, ok:0, answered:false};
+function renderQuiz() {
+  const box = $('#quizBox');
+  if (qz.i >= QUIZ.length) {
+    box.innerHTML = `<h4>Kết quả: ${qz.ok}/${QUIZ.length} câu đúng</h4><p class="small">${qz.ok >= 9 ? 'Rất tốt!' : qz.ok >= 6 ? 'Khá tốt. Hãy xem lại các câu sai.' : 'Hãy chạy lại chương trình mẫu từng bước rồi làm lại.'}</p><button class="btn primary" id="qRe" type="button">Làm lại</button>`;
+    $('#qRe').onclick = () => { qz = {i:0, ok:0, answered:false}; renderQuiz(); };
+    return;
+  }
+  const q = QUIZ[qz.i], idx = shuffle(q.o.map((_, i) => i));
+  box.innerHTML = `<p class="small">Câu ${qz.i + 1}/${QUIZ.length} · Đúng ${qz.ok}</p><div class="quiz-q">${q.q}</div>` + idx.map(i => `<button class="quiz-opt" type="button" data-i="${i}">${q.o[i]}</button>`).join('') + `<div id="qex"></div>`;
+  qz.answered = false;
+  $$('.quiz-opt', box).forEach(b => b.addEventListener('click', () => {
+    if (qz.answered) return; qz.answered = true;
+    const ok = +b.dataset.i === q.a; if (ok) qz.ok++;
+    b.classList.add(ok ? 'ok' : 'bad');
+    $$('.quiz-opt', box).forEach(x => { x.disabled = true; if (+x.dataset.i === q.a) x.classList.add('ok'); });
+    $('#qex').innerHTML = `<div class="quiz-ex"><b>${ok ? 'Đúng.' : 'Chưa đúng.'}</b> ${q.e}</div><p style="margin:10px 0 0"><button class="btn primary" id="qNext" type="button">${qz.i + 1 < QUIZ.length ? 'Câu tiếp' : 'Xem kết quả'}</button></p>`;
+    $('#qNext').onclick = () => { qz.i++; renderQuiz(); };
+  }));
+}
+
+/* =====================================================================
+   6. Khởi tạo
+   ===================================================================== */
+function setPreset(i) {
+  sim.preset = i; const p = PRESETS[i];
+  $('#presetDesc').textContent = p.desc;
+  sim.vals = Object.fromEntries(p.inputs.map(x => [x.k, x.v]));
+  $('#presetInputs').innerHTML = p.inputs.map(x => `<label>${x.label}<input type="number" data-k="${x.k}" min="${x.min}" max="${x.max}" value="${sim.vals[x.k]}"></label>`).join('');
+  $$('#presetInputs input').forEach(inp => inp.addEventListener('change', () => {
+    let v = parseInt(inp.value, 10); const x = p.inputs.find(z => z.k === inp.dataset.k);
+    if (isNaN(v)) v = x.v; v = Math.max(x.min, Math.min(x.max, v)); inp.value = v; sim.vals[x.k] = v;
+    $('#src').value = p.src(sim.vals); loadProgram($('#src').value);
+  }));
+  $('#src').value = p.src(sim.vals);
+  loadProgram($('#src').value);
+}
+function start() { if (!sim.playing && !sim.predict) playLoop(false); }
+function init() {
+  try { const t = localStorage.getItem('cpu-theme'); if (t) document.documentElement.dataset.theme = t; else if (matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.dataset.theme = 'dark'; } catch (e) {}
+  buildSvg(); buildWaveLabels(); renderIsa();
+  $('#preset').innerHTML = PRESETS.map((p, i) => `<option value="${i}">${p.name}</option>`).join('');
+  $('#preset').onchange = e => setPreset(+e.target.value);
+  $('#bAsm').onclick = () => loadProgram($('#src').value);
+  $('#bReset').onclick = () => { if (sim.prog) resetSim(); };
+  $('#bPrev').onclick = () => { if (sim.idx > 0) goTo(sim.idx - 1); };
+  $('#bNext').onclick = requestNext;
+  $('#bPlay').onclick = () => { if (!sim.predict) playLoop(false); };
+  $('#bInstr').onclick = () => { if (!sim.playing) playLoop(true); };
+  $('#bHalt').onclick = runToHalt;
+  $$('#speedSeg button').forEach(b => b.onclick = () => { speed = +b.dataset.s; $$('#speedSeg button').forEach(x => x.setAttribute('aria-pressed', x === b)); });
+  $('#predict').onchange = e => { sim.predict = e.target.checked; sim.playing = false; token++; sim.busy = false; clearLayers(); $('#predictBox').innerHTML = ''; render(true); if (sim.predict) askPredictSafe(); };
+  $('#freq').oninput = () => renderStats(cur().state);
+  $('#waveSvg').addEventListener('click', e => { const r = e.target.closest('.w-hit'); if (r) goTo(+r.dataset.i); });
+  $$('.tabbar button').forEach(b => b.onclick = () => {
+    $$('.tabbar button').forEach(x => x.setAttribute('aria-selected', x === b));
+    $$('.panel').forEach(p => p.hidden = p.id !== 'tab-' + b.dataset.tab);
+  });
+  $('#motion').onchange = e => { calm = !e.target.checked; document.documentElement.classList.toggle('calm', calm); try { localStorage.setItem('cpu-calm', calm ? '1' : '0'); } catch (x) {} };
+  try { if (localStorage.getItem('cpu-calm') === '1') { calm = true; $('#motion').checked = false; document.documentElement.classList.add('calm'); } } catch (x) {}
+  $('#btnTheme').onclick = () => { const d = document.documentElement, n = d.dataset.theme === 'dark' ? 'light' : 'dark'; d.dataset.theme = n; try { localStorage.setItem('cpu-theme', n); } catch (e) {} };
+  const dlg = $('#help');
+  $('#btnHelp').onclick = () => dlg.showModal();
+  $('#helpClose').onclick = () => { dlg.close(); };
+  dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+  dlg.addEventListener('close', () => setTimeout(start, 500));
+  document.addEventListener('keydown', e => {
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.ctrlKey || e.metaKey || e.altKey || dlg.open) return;
+    if (e.key === ' ') { e.preventDefault(); if (!sim.predict) playLoop(false); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); requestNext(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); if (sim.idx > 0) goTo(sim.idx - 1); }
+    else if (e.key === 'r' || e.key === 'R') resetSim();
+  });
+  setPreset(0); renderQuiz();
+  let seen = false; try { seen = !!localStorage.getItem('cpu2-seen'); localStorage.setItem('cpu2-seen', '1'); } catch (e) {}
+  if (!seen) dlg.showModal(); else setTimeout(start, 900);
+}
+init();
+})();
+</script>
+</body>
+</html>

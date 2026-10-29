@@ -1,0 +1,1151 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tập lệnh Assembly cho người mới</title>
+<style>
+:root{
+  --bg1:#eef2fb; --bg2:#e4ebf8; --card:#ffffff; --card2:#f6f8fc; --line:#d7e0f0; --text:#0f1b33; --muted:#5c6b86;
+  --accent:#4f46e5; --accent-soft:#e3e1ff;
+  --c-move:#2563eb; --c-arith:#ea580c; --c-logic:#7c3aed; --c-shift:#0d9488; --c-ctrl:#db2777; --c-io:#64748b;
+  --ok:#16a34a; --bad:#dc2626; --warn:#d97706;
+  --code-bg:#f1f5fb; --shadow:0 1px 2px rgba(15,27,51,.06),0 8px 24px rgba(15,27,51,.07);
+  --mono:"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+  --sans:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+}
+:root[data-theme="dark"]{
+  --bg1:#0a1120; --bg2:#0e1830; --card:#121c33; --card2:#17233f; --line:#2b3b60; --text:#e8eefb; --muted:#9db0d3;
+  --accent:#8b8cff; --accent-soft:#272a66;
+  --c-move:#60a5fa; --c-arith:#fb923c; --c-logic:#a78bfa; --c-shift:#2dd4bf; --c-ctrl:#f472b6; --c-io:#94a3b8;
+  --ok:#4ade80; --bad:#f87171; --warn:#fbbf24;
+  --code-bg:#0c1529; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:linear-gradient(180deg,var(--bg1),var(--bg2)) fixed;color:var(--text);font:15px/1.55 var(--sans);-webkit-font-smoothing:antialiased;min-height:100vh}
+button,select,input,textarea{font:inherit;color:inherit}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+code,.mono{font-family:var(--mono)}
+
+/* header */
+.top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 24px;background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#ea580c,#db2777);color:#fff;display:grid;place-items:center;font:800 17px var(--mono);box-shadow:0 4px 12px rgba(219,39,119,.35)}
+.brand h1{margin:0;font-size:19px;line-height:1.2}
+.brand p{margin:0;font-size:13px;color:var(--muted)}
+.top-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.btn,select{border:1px solid var(--line);background:var(--card2);border-radius:11px;padding:8px 13px;cursor:pointer}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:700;transition:background .15s,border-color .15s,transform .06s;text-decoration:none;color:var(--text)}
+.btn:hover:not(:disabled){border-color:var(--accent);background:var(--accent-soft)}
+.btn:active:not(:disabled){transform:translateY(1px)}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 45%,transparent)}
+:root[data-theme="dark"] .btn.primary{color:#0a1120}
+.btn.small{padding:5px 10px;font-size:13px;border-radius:9px}
+.motion{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.motion input{width:17px;height:17px;accent-color:var(--accent)}
+
+/* layout */
+.layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(430px,1fr);gap:18px;padding:18px 24px 44px;max-width:1760px;margin:0 auto;align-items:start}
+.main{min-width:0;display:flex;flex-direction:column;gap:14px}
+.side{min-width:0}
+@media (min-width:1101px){.side{position:sticky;top:76px;max-height:calc(100vh - 92px);overflow:auto;padding:2px 4px 2px 2px}}
+@media (max-width:1100px){.layout{grid-template-columns:minmax(0,1fr);padding:14px}.top{padding:10px 14px}}
+
+/* tabs */
+.tabbar{display:flex;gap:8px;flex-wrap:wrap}
+.tabbar button{flex:1;min-width:150px;padding:12px 14px;border-radius:14px;border:2px solid var(--line);background:var(--card);cursor:pointer;font-weight:800;font-size:14.5px;color:var(--muted);text-align:left;transition:all .2s}
+.tabbar button small{display:block;font-weight:500;font-size:12px}
+.tabbar button[aria-selected="true"]{border-color:var(--accent);color:var(--text);background:var(--accent-soft);box-shadow:var(--shadow)}
+.tabpanel[hidden]{display:none}
+.tabpanel{display:flex;flex-direction:column;gap:14px}
+.sec{padding:18px 20px}
+.sec h2{margin:0 0 4px;font-size:19px}
+.sec h3{margin:14px 0 6px;font-size:15.5px}
+.sec p{margin:6px 0}
+.lead{color:var(--muted);font-size:14.5px}
+.small{font-size:12.5px;color:var(--muted)}
+
+/* giải phẫu lệnh */
+.anat{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;margin:12px 0}
+.anat .part{padding:10px 14px;border-radius:13px;border:2px solid;font:800 22px var(--mono);text-align:center;min-width:92px}
+.anat .part small{display:block;font:600 12px var(--sans);margin-top:2px}
+.anat .p1{border-color:var(--c-arith);background:color-mix(in srgb,var(--c-arith) 11%,var(--card))}
+.anat .p2{border-color:var(--c-move);background:color-mix(in srgb,var(--c-move) 11%,var(--card))}
+.anat .p3{border-color:var(--c-shift);background:color-mix(in srgb,var(--c-shift) 11%,var(--card))}
+.anat .sep{align-self:center;font:800 24px var(--mono);color:var(--muted)}
+.anat .eq{align-self:center;padding:8px 12px;border-radius:12px;background:var(--code-bg);font:700 16px var(--mono)}
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0}
+.three>div{padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--card2);font-size:14px}
+.three b{display:block;font-size:15px;margin-bottom:2px}
+.three code{background:var(--code-bg);padding:1px 6px;border-radius:5px;font-size:13px}
+@media (max-width:700px){.three{grid-template-columns:1fr}}
+.note{padding:10px 14px;border-radius:12px;background:color-mix(in srgb,var(--warn) 12%,var(--card));border:1px solid color-mix(in srgb,var(--warn) 45%,var(--line));font-size:14px;margin:10px 0}
+
+/* AX explorer */
+.axbox{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:10px 0}
+.axbig{border:2px solid var(--c-move);border-radius:16px;padding:10px 14px;background:color-mix(in srgb,var(--c-move) 7%,var(--card))}
+.axbig .ttl{font:800 13px var(--sans);color:var(--c-move);margin-bottom:6px;display:flex;justify-content:space-between;gap:20px}
+.axhalves{display:flex;gap:10px}
+.half{border:1.5px solid var(--line);border-radius:12px;padding:8px 10px;background:var(--card);min-width:158px}
+.half label{font:800 12px var(--sans);color:var(--muted);display:flex;justify-content:space-between}
+.half input{width:100%;margin:4px 0;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card2);font:800 20px var(--mono);text-align:center}
+.bits{display:flex;gap:3px;margin-top:4px}
+.bit{flex:1;min-width:15px;height:24px;border-radius:5px;display:grid;place-items:center;font:700 12px var(--mono);background:var(--card2);border:1px solid var(--line);color:var(--muted);transition:all .25s}
+.bit.on{background:var(--c-move);border-color:var(--c-move);color:#fff}
+:root[data-theme="dark"] .bit.on{color:#07101f}
+.bit.flip{animation:flip .6s}
+@keyframes flip{0%{transform:scale(1.5) rotate(-12deg)}100%{transform:none}}
+.calm .bit.flip,.calm .pop{animation:none}
+
+/* catalog */
+.group{padding:0;overflow:hidden}
+.ghead{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer;border:none;background:none;width:100%;text-align:left}
+.ghead .gdot{width:14px;height:14px;border-radius:5px;flex:0 0 14px}
+.ghead b{font-size:16.5px}
+.ghead span.cnt{margin-left:auto;font-size:12.5px;color:var(--muted)}
+.ghead .chev{transition:transform .2s;color:var(--muted)}
+.group[data-open="true"] .chev{transform:rotate(90deg)}
+.gbody{padding:0 18px 16px;display:none}
+.group[data-open="true"] .gbody{display:block}
+.glead{margin:0 0 10px;color:var(--muted);font-size:14px}
+.ins{border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:10px 0;background:var(--card2)}
+.ins-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.ins-syn{font:800 17px var(--mono)}
+.tag{font:700 11.5px var(--sans);padding:2px 9px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--muted)}
+.ins p{margin:6px 0;font-size:14px}
+.ins pre{margin:8px 0;padding:9px 12px;border-radius:10px;background:var(--code-bg);border:1px solid var(--line);font:13.5px/1.6 var(--mono);overflow:auto}
+.ins .see{font-size:13.5px;color:var(--muted)}
+.ins .try{margin-left:auto}
+
+/* flags table / generic table */
+table.t{width:100%;border-collapse:collapse;font-size:13.5px}
+table.t th,table.t td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+table.t th{font-size:12px;color:var(--muted)}
+table.t td.m{font-family:var(--mono);font-weight:700}
+
+/* compiler */
+textarea.src{width:100%;min-height:120px;resize:vertical;border:1.5px solid var(--line);background:var(--code-bg);border-radius:12px;padding:10px 12px;font:15px/1.7 var(--mono);tab-size:4}
+textarea.asm{min-height:200px;font-size:13.5px;line-height:1.6}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.chipbtn{padding:5px 11px;border-radius:999px;border:1.5px solid var(--line);background:var(--card2);cursor:pointer;font:700 13px var(--mono)}
+.chipbtn:hover{border-color:var(--accent);background:var(--accent-soft)}
+.seg{display:inline-grid;grid-template-columns:1fr 1fr;border:1.5px solid var(--line);border-radius:11px;overflow:hidden}
+.seg button{border:none;background:var(--card2);padding:7px 14px;cursor:pointer;font-weight:700;font-size:13.5px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+:root[data-theme="dark"] .seg button[aria-pressed="true"]{color:#0a1120}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.vars{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0}
+.vars label{display:flex;align-items:center;gap:6px;font:700 14px var(--mono)}
+.vars input{width:78px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card2);font:700 14px var(--mono)}
+.errs{padding:10px 14px;border-radius:12px;background:color-mix(in srgb,var(--bad) 12%,var(--card));border:1px solid var(--bad);font-size:13.5px;margin:8px 0}
+.errs[hidden]{display:none}
+.errs ul{margin:4px 0 0;padding-left:18px}
+.stmt{border:1px solid var(--line);border-radius:14px;margin:10px 0;overflow:hidden}
+.stmt-h{padding:8px 14px;background:var(--accent-soft);font:800 15px var(--mono)}
+.stmt-b{padding:6px 0;background:var(--code-bg)}
+.cl{display:flex;gap:14px;padding:3px 14px;font:14px/1.6 var(--mono)}
+.cl .cc{flex:0 0 190px;font-weight:800}
+.cl .cm{color:var(--muted);font:13px var(--sans);align-self:center}
+.res{width:100%}
+.res td.bad{color:var(--bad);font-weight:700}
+.res td.ok{color:var(--ok);font-weight:700}
+
+/* exercises */
+.lvls{display:flex;gap:6px;flex-wrap:wrap}
+.lvls button{padding:6px 12px;border-radius:999px;border:1.5px solid var(--line);background:var(--card2);cursor:pointer;font-weight:700;font-size:13px}
+.lvls button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .lvls button[aria-pressed="true"]{color:#0a1120}
+.score{display:flex;gap:16px;flex-wrap:wrap;font-size:13.5px;color:var(--muted)}
+.score b{color:var(--text);font-family:var(--mono)}
+.ex-q{font-size:17px;font-weight:700;margin:6px 0}
+.codeblock{margin:8px 0;padding:12px 16px;border-radius:12px;background:var(--code-bg);border:1px solid var(--line);font:15.5px/1.75 var(--mono);white-space:pre;overflow:auto}
+.answer{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.answer .eq{font:800 20px var(--mono)}
+.answer input{width:150px;padding:9px 12px;border:2px solid var(--line);border-radius:11px;background:var(--card2);font:800 19px var(--mono)}
+.answer input:focus{border-color:var(--accent);outline:none}
+.fbk{margin:10px 0;padding:11px 14px;border-radius:12px;font-size:14.5px}
+.fbk.ok{background:color-mix(in srgb,var(--ok) 15%,var(--card));border:1px solid var(--ok)}
+.fbk.bad{background:color-mix(in srgb,var(--bad) 13%,var(--card));border:1px solid var(--bad)}
+.fbk.info{background:var(--code-bg);border:1px solid var(--line)}
+.fbk[hidden]{display:none}
+.trace td{font-size:13px}
+.trace td.ins{font:700 13.5px var(--mono);white-space:nowrap}
+
+/* runner */
+.runner{padding:14px 16px}
+.rh{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rh h3{margin:0;font-size:16px}
+.rsrc{font-size:12.5px;color:var(--muted)}
+.listing{margin-top:10px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--code-bg);font:14px/1 var(--mono);max-height:280px;overflow-y:auto}
+.lrow{display:flex;align-items:center;gap:10px;padding:7px 10px;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent);position:relative;transition:background .25s}
+.lrow:last-child{border-bottom:none}
+.lrow .ln{flex:0 0 22px;color:var(--muted);font-size:12px;text-align:right}
+.lrow .lb{color:var(--c-ctrl);font-weight:700}
+.lrow .li{font-weight:800;white-space:nowrap}
+.lrow .lc{color:var(--muted);font:12px var(--sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lrow .mk{position:absolute;right:8px;font:800 10.5px var(--sans);padding:2px 7px;border-radius:999px;display:none}
+.lrow.next{background:color-mix(in srgb,var(--accent) 12%,var(--code-bg))}
+.lrow.next .mk{display:block;background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent)}
+.lrow.last{background:color-mix(in srgb,var(--ok) 16%,var(--code-bg))}
+.lrow.last .mk{display:block;background:var(--ok);color:#fff}
+.lrow.dat .li{color:var(--c-move);font-weight:600}
+.edit{margin-top:10px}
+.edit[hidden]{display:none}
+.rctl{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.rctl .btn{padding:9px 6px;font-size:13.5px}
+.rtools{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+.rtools select{padding:4px 8px;font-size:13px}
+.lock{margin-top:10px;padding:9px 12px;border-radius:11px;background:color-mix(in srgb,var(--warn) 13%,var(--card));border:1px solid color-mix(in srgb,var(--warn) 50%,var(--line));font-size:13.5px}
+.lock[hidden]{display:none}
+.nar{margin-top:10px;padding:11px 14px;border-radius:12px;background:var(--accent-soft);border:1px solid var(--accent);font-size:14.5px;min-height:3.2em}
+.nar b{font-family:var(--mono)}
+.regs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.reg{border:1.5px solid var(--line);border-radius:14px;padding:8px 10px;background:var(--card2)}
+.reg-h{display:flex;align-items:baseline;gap:8px}
+.reg-h b{font:800 17px var(--mono);color:var(--c-move)}
+.reg-h .rd{margin-left:auto;font:800 17px var(--mono)}
+.reg-h .rx{font:12px var(--mono);color:var(--muted)}
+.bytes{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:5px}
+.byte{border:1px solid var(--line);border-radius:10px;padding:4px 6px;background:var(--card);transition:all .3s}
+.byte label{font:800 10.5px var(--sans);color:var(--muted);display:flex;justify-content:space-between}
+.byte .bv{font:800 17px var(--mono)}
+.byte .bd{font:11.5px var(--mono);color:var(--muted);margin-left:6px}
+.byte .bits{margin-top:3px}
+.byte .bit{height:16px;min-width:0;font-size:10px;border-radius:4px}
+.byte.chg{border-color:var(--accent);background:var(--accent-soft)}
+.reg.small .bytes{grid-template-columns:1fr}
+.pop{animation:pop .7s cubic-bezier(.2,.9,.3,1.3)}
+@keyframes pop{0%{transform:scale(1.18)}100%{transform:none}}
+.flags{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.flags>b{font-size:13px;color:var(--muted);margin-right:2px}
+.fl{display:flex;flex-direction:column;align-items:center;gap:1px;font:700 11.5px var(--mono);color:var(--muted)}
+.fl i{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;border:2px solid var(--line);background:var(--card2);font:800 14px var(--mono);font-style:normal;color:var(--muted);transition:all .3s}
+.fl.on i{background:var(--c-ctrl);border-color:var(--c-ctrl);color:#fff;box-shadow:0 0 10px color-mix(in srgb,var(--c-ctrl) 60%,transparent)}
+.fl.chg i{outline:3px solid var(--accent-soft)}
+.mem{margin-top:12px}
+.mem h4{margin:0 0 4px;font-size:13px;color:var(--muted)}
+.memrow{display:flex;gap:10px;align-items:center;padding:4px 10px;border:1px solid var(--line);border-radius:9px;margin:3px 0;font:14px var(--mono);background:var(--card2)}
+.memrow .mn{font-weight:800;min-width:56px}
+.memrow .ms{font:700 11px var(--sans);color:var(--muted);min-width:26px}
+.memrow .mv{margin-left:auto;font-weight:800}
+.memrow.chg{border-color:var(--accent);background:var(--accent-soft)}
+.screen{margin-top:12px;padding:8px 12px;border-radius:10px;background:#0b1220;color:#7CFC9A;font:15px var(--mono);min-height:34px;white-space:pre-wrap}
+.screen small{color:#6b7a99;font:11px var(--sans);display:block}
+.stk{font:13px var(--mono);color:var(--muted);margin-top:8px}
+.endmsg{margin-top:10px;padding:9px 12px;border-radius:11px;font-size:13.5px}
+.endmsg.err{background:color-mix(in srgb,var(--bad) 13%,var(--card));border:1px solid var(--bad)}
+.endmsg.done{background:color-mix(in srgb,var(--ok) 13%,var(--card));border:1px solid var(--ok)}
+.endmsg[hidden]{display:none}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <div class="logo" aria-hidden="true">MOV</div>
+    <div>
+      <h1>Tập lệnh Assembly cho người mới</h1>
+      <p>Học các lệnh, xem trình biên dịch tự sinh mã, rồi luyện bài tập</p>
+    </div>
+  </div>
+  <div class="top-actions">
+    <a class="btn" href="mo-phong-cpu.html" title="Xem CPU nạp, giải mã và thực thi từng lệnh">⚙ Xem CPU chạy lệnh</a>
+    <label class="motion"><input type="checkbox" id="motion" checked> Hiệu ứng chuyển động</label>
+    <button class="btn" id="btnTheme" type="button">Sáng / Tối</button>
+  </div>
+</header>
+
+<main class="layout">
+  <div class="main">
+    <div class="tabbar" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="intro">1 · Tập lệnh gồm những gì?<small>Làm quen, bấm “Thử” để chạy</small></button>
+      <button role="tab" aria-selected="false" data-tab="comp">2 · Từ a = b + c ra Assembly<small>Trình biên dịch tự động</small></button>
+      <button role="tab" aria-selected="false" data-tab="ex">3 · Bài tập<small>Giá trị của AL sau khi chạy là …</small></button>
+    </div>
+
+    <!-- ===================== TAB 1 ===================== -->
+    <section class="tabpanel" id="tab-intro">
+      <div class="card sec">
+        <h2>Một dòng lệnh Assembly trông như thế nào?</h2>
+        <p class="lead">CPU chỉ hiểu các dãy bit gọi là <b>mã máy</b>. Assembly (hợp ngữ) là cách viết mã máy bằng chữ để con người đọc được. Mỗi dòng là <b>một lệnh</b>, và lệnh thường có dạng:</p>
+        <div class="anat">
+          <div class="part p1">ADD<small>mã lệnh: làm gì?</small></div>
+          <div class="part p2">AL<small>đích: nhận kết quả</small></div>
+          <div class="sep">,</div>
+          <div class="part p3">BL<small>nguồn: cung cấp dữ liệu</small></div>
+          <div class="eq">AL ← AL + BL</div>
+        </div>
+        <p>Cách đọc nhanh: <b>đích</b> luôn đứng trước, giống phép gán <code>đích = nguồn</code> trong lập trình. Với <code>MOV AL, 5</code> nghĩa là “AL nhận giá trị 5”. Với <code>ADD AL, BL</code> nghĩa là “cộng BL vào AL, kết quả để lại trong AL”.</p>
+        <h3>Dữ liệu nằm ở đâu? Ba loại toán hạng</h3>
+        <div class="three">
+          <div><b>Thanh ghi</b><code>AL</code> <code>BX</code> <code>CX</code><br>Các “ngăn kéo” nằm ngay trong CPU. Truy cập rất nhanh, nhưng chỉ có vài cái.</div>
+          <div><b>Số cụ thể</b><code>5</code> <code>3Fh</code> <code>'A'</code><br>Giá trị ghi thẳng trong lệnh. Chỉ làm <i>nguồn</i>, không thể làm đích.</div>
+          <div><b>Ô nhớ (biến)</b><code>[a]</code> <code>[tong]</code><br>Dữ liệu cất trong RAM. Chậm hơn thanh ghi, nhưng chứa được nhiều.</div>
+        </div>
+        <div class="note"><b>Hai quy tắc hay vi phạm:</b> (1) không chép trực tiếp ô nhớ sang ô nhớ, phải đi qua thanh ghi; (2) hai toán hạng phải cùng kích thước (AL 8 bit không đi với BX 16 bit).</div>
+      </div>
+
+      <div class="card sec">
+        <h2>Thanh ghi AX gồm hai nửa: AH và AL</h2>
+        <p class="lead">AX có 16 bit, được chia làm nửa cao <b>AH</b> và nửa thấp <b>AL</b> (mỗi nửa 8 bit). BX, CX, DX cũng vậy (BH/BL, CH/CL, DH/DL). Thử gõ số vào ô bất kỳ:</p>
+        <div class="axbox">
+          <div class="axbig">
+            <div class="ttl"><span>AX (16 bit)</span><span class="mono" id="axDec">0</span></div>
+            <div class="axhalves">
+              <div class="half"><label><span>AH (nửa cao)</span><span>hex</span></label><input id="inAH" value="12" aria-label="AH dạng hex"><div class="bits" id="bitsAH"></div></div>
+              <div class="half"><label><span>AL (nửa thấp)</span><span>hex</span></label><input id="inAL" value="34" aria-label="AL dạng hex"><div class="bits" id="bitsAL"></div></div>
+            </div>
+          </div>
+          <div>
+            <div class="row"><span class="small">AX bằng</span><input id="inAX" class="mono" style="width:100px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card2);font-weight:800" value="1234"> <span class="small">hex</span></div>
+            <div class="row"><button class="btn small" id="axInc" type="button">AL + 1</button><button class="btn small" id="axShl" type="button">AL × 2 (dịch trái)</button><button class="btn small" id="axNot" type="button">Đảo bit AL</button></div>
+            <p class="small">Thử AL = FF rồi bấm “AL + 1”: AL tràn về 00 và <b>AH không tự tăng</b>.</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="catalog"></div>
+
+      <div class="card sec">
+        <h2>Các cờ trạng thái (FLAGS)</h2>
+        <p class="lead">Sau nhiều phép tính, CPU ghi lại đặc điểm của kết quả vào các “đèn báo” gọi là cờ. Các lệnh nhảy có điều kiện đọc những cờ này.</p>
+        <table class="t">
+          <tr><th>Cờ</th><th>Tên</th><th>Bằng 1 khi</th></tr>
+          <tr><td class="m">ZF</td><td>Zero</td><td>kết quả bằng 0</td></tr>
+          <tr><td class="m">SF</td><td>Sign</td><td>bit cao nhất của kết quả là 1 (nếu coi là số có dấu thì âm)</td></tr>
+          <tr><td class="m">CF</td><td>Carry</td><td>phép cộng có nhớ ra ngoài, hoặc phép trừ phải mượn (số không dấu vượt giới hạn)</td></tr>
+          <tr><td class="m">OF</td><td>Overflow</td><td>kết quả sai khi coi là số có dấu (ví dụ 127 + 1 trong 8 bit)</td></tr>
+          <tr><td class="m">PF</td><td>Parity</td><td>số bit 1 trong 8 bit thấp của kết quả là chẵn</td></tr>
+          <tr><td class="m">AF</td><td>Auxiliary</td><td>có nhớ hoặc mượn giữa bit 3 và bit 4 (dùng cho số BCD)</td></tr>
+        </table>
+        <div class="note"><b>Số có dấu hay không dấu?</b> Cùng một dãy bit, <code>1111 1111</code> là 255 nếu không dấu và −1 nếu có dấu. Vì vậy có hai họ lệnh nhảy: <code>JA / JB</code> cho số không dấu, <code>JG / JL</code> cho số có dấu. Chúng <b>không</b> thay thế được cho nhau.</div>
+      </div>
+    </section>
+
+    <!-- ===================== TAB 2 ===================== -->
+    <section class="tabpanel" id="tab-comp" hidden>
+      <div class="card sec">
+        <h2>Gõ phép gán, nhận về mã Assembly</h2>
+        <p class="lead">Viết các câu lệnh quen thuộc như trong C. Trang sẽ <b>tự biên dịch</b> thành các lệnh MOV, ADD, SUB, MUL, DIV rồi nạp vào máy ảo bên cạnh để bạn chạy từng dòng.</p>
+        <textarea class="src" id="cSrc" spellcheck="false" aria-label="Chương trình bậc cao">a = b + c</textarea>
+        <div class="chips" id="cEx"></div>
+        <div class="row">
+          <span class="small">Kích thước biến:</span>
+          <div class="seg" id="cSize"><button type="button" data-s="8" aria-pressed="true">8 bit (AL)</button><button type="button" data-s="16" aria-pressed="false">16 bit (AX)</button></div>
+          <span class="small">Hỗ trợ: <code>+ − × / %</code>, dấu ngoặc, <code>+=</code> <code>-=</code>, <code>a++</code>, <code>a--</code>. Mỗi câu một dòng.</span>
+        </div>
+        <div class="errs" id="cErr" hidden></div>
+        <h3>Giá trị ban đầu của các biến</h3>
+        <div class="vars" id="cVars"></div>
+      </div>
+      <div class="card sec">
+        <h2>Mã Assembly được sinh ra</h2>
+        <div id="cOut"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn primary" id="cRun" type="button">▶ Chạy hết và xem kết quả</button>
+          <span class="small">Hoặc bấm “Bước” ở máy ảo bên cạnh để xem từng dòng.</span>
+        </div>
+        <div id="cResult"></div>
+      </div>
+    </section>
+
+    <!-- ===================== TAB 3 ===================== -->
+    <section class="tabpanel" id="tab-ex" hidden>
+      <div class="card sec">
+        <div class="row" style="justify-content:space-between">
+          <div class="lvls" id="lvls" role="group" aria-label="Chọn mức độ">
+            <button type="button" data-l="0" aria-pressed="true">Tất cả</button>
+            <button type="button" data-l="1" aria-pressed="false">1 · Cơ bản</button>
+            <button type="button" data-l="2" aria-pressed="false">2 · Logic</button>
+            <button type="button" data-l="3" aria-pressed="false">3 · Dịch, nhân, chia</button>
+            <button type="button" data-l="4" aria-pressed="false">4 · Cờ và vòng lặp</button>
+          </div>
+          <div class="score">Đúng: <b id="scOk">0</b>/<b id="scN">0</b> · Chuỗi đúng: <b id="scStreak">0</b></div>
+        </div>
+      </div>
+      <div class="card sec" id="exCard">
+        <div class="small" id="exMeta"></div>
+        <div class="ex-q" id="exQ"></div>
+        <pre class="codeblock" id="exCode"></pre>
+        <div class="answer">
+          <span class="eq" id="exLhs">AL =</span>
+          <input id="exIn" autocomplete="off" spellcheck="false" aria-label="Đáp án của bạn">
+          <button class="btn primary" id="exCheck" type="button">Kiểm tra</button>
+          <button class="btn" id="exHint" type="button">💡 Gợi ý</button>
+          <button class="btn" id="exSolve" type="button">Xem lời giải</button>
+          <button class="btn" id="exNew" type="button">Bài mới ↻</button>
+        </div>
+        <p class="small" id="exFmt"></p>
+        <div class="fbk" id="exFb" hidden></div>
+        <div id="exSol"></div>
+      </div>
+    </section>
+  </div>
+
+  <aside class="side">
+    <div class="card runner">
+      <div class="rh">
+        <h3>Máy ảo 8086</h3>
+        <span class="rsrc" id="rSrc">Chưa có chương trình</span>
+        <button class="btn small" id="rEditBtn" type="button" style="margin-left:auto">✎ Sửa mã</button>
+      </div>
+      <div class="lock" id="rLock" hidden>🔒 Hãy trả lời (hoặc bấm “Xem lời giải”) rồi máy ảo sẽ mở để bạn kiểm tra từng bước.</div>
+      <div class="edit" id="rEdit" hidden>
+        <textarea class="src asm" id="rTxt" spellcheck="false" aria-label="Mã Assembly"></textarea>
+        <div class="row"><button class="btn primary" id="rApply" type="button">Nạp mã này</button><span class="small">Dạng khai báo biến: <code>a DB 5</code> (8 bit) hoặc <code>a DW 5</code> (16 bit).</span></div>
+      </div>
+      <div class="errs" id="rErr" hidden></div>
+      <div class="listing" id="listing"></div>
+      <div class="rctl">
+        <button class="btn" id="rBack" type="button">◀ Lùi</button>
+        <button class="btn primary" id="rStep" type="button">Bước ▶</button>
+        <button class="btn" id="rAuto" type="button">⏵ Tự chạy</button>
+        <button class="btn" id="rReset" type="button">↺ Làm lại</button>
+      </div>
+      <div class="rtools">
+        <button class="btn small" id="rEnd" type="button">⏩ Chạy hết</button>
+        <span>Tốc độ</span>
+        <select id="rSpeed" aria-label="Tốc độ tự chạy"><option value="1100">Chậm</option><option value="650" selected>Vừa</option><option value="260">Nhanh</option></select>
+      </div>
+      <div class="nar" id="rNar">Chọn một ví dụ hoặc nhập mã, rồi bấm “Bước” để chạy từng dòng.</div>
+      <div class="endmsg" id="rEnd2" hidden></div>
+      <div class="regs" id="regs"></div>
+      <div class="flags" id="flags"></div>
+      <div class="mem" id="mem"></div>
+      <div class="stk" id="stk"></div>
+      <div class="screen" id="screen" hidden><small>Màn hình (INT 21h, AH = 2)</small><span id="scrTxt"></span></div>
+    </div>
+  </aside>
+</main>
+
+<script>
+(() => {
+'use strict';
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+// Cố ý không theo prefers-reduced-motion của hệ điều hành (chuyển động là nội dung bài học);
+// người dùng tự tắt bằng công tắc “Hiệu ứng chuyển động”.
+let calm = false;
+
+/* =====================================================================
+   1. ENGINE 8086 rút gọn
+   ===================================================================== */
+const R8 = {AL:['AX',0], AH:['AX',8], BL:['BX',0], BH:['BX',8], CL:['CX',0], CH:['CX',8], DL:['DX',0], DH:['DX',8]};
+const R16 = ['AX','BX','CX','DX','SI','DI'];
+const MASK = {8:0xFF, 16:0xFFFF}, SIGN = {8:0x80, 16:0x8000};
+const JCC = {
+  JE:s => s.f.ZF, JNE:s => !s.f.ZF, JA:s => !s.f.CF && !s.f.ZF, JAE:s => !s.f.CF, JB:s => s.f.CF, JBE:s => s.f.CF || s.f.ZF,
+  JG:s => !s.f.ZF && s.f.SF === s.f.OF, JGE:s => s.f.SF === s.f.OF, JL:s => s.f.SF !== s.f.OF, JLE:s => s.f.ZF || s.f.SF !== s.f.OF
+};
+const ALIAS = {JZ:'JE', JNZ:'JNE', JC:'JB', JNC:'JAE', JNB:'JAE', JNAE:'JB', JNBE:'JA', JNA:'JBE', JNL:'JGE', JNG:'JLE', JNGE:'JL', JNLE:'JG'};
+const ARITY = {MOV:2, ADD:2, SUB:2, CMP:2, AND:2, OR:2, XOR:2, XCHG:2, INC:1, DEC:1, NEG:1, NOT:1, MUL:1, DIV:1, PUSH:1, POP:1,
+  SHL:2, SHR:2, ROL:2, ROR:2, JMP:1, LOOP:1, CALL:1, RET:0, INT:1, HLT:0, NOP:0};
+for (const k in JCC) ARITY[k] = 1;
+const isJump = op => op === 'JMP' || op === 'LOOP' || op === 'CALL' || op in JCC;
+const MAXSTEPS = 5000;
+
+const hexN = (v, size) => v.toString(16).toUpperCase().padStart(size / 4, '0') + 'h';
+const binN = (v, size) => v.toString(2).padStart(size, '0').replace(/(\d{4})(?=\d)/g, '$1 ');
+const sgnV = (v, size) => v >= SIGN[size] ? v - MASK[size] - 1 : v;
+const parseNum = t => {
+  let m;
+  if ((m = t.match(/^'(.)'$/))) return m[1].charCodeAt(0);
+  if (/^[-+]?\d+$/.test(t)) return parseInt(t, 10);
+  if (/^-?0x[0-9a-f]+$/i.test(t)) return parseInt(t, 16);
+  if (/^[01]+b$/i.test(t)) return parseInt(t, 2);
+  if (/^-?[0-9][0-9a-f]*h$/i.test(t)) return parseInt(t, 16);
+  return null;
+};
+const commentIdx = s => { let q = false; for (let i = 0; i < s.length; i++) { if (s[i] === "'") q = !q; else if (s[i] === ';' && !q) return i; } return -1; };
+const splitOps = s => { const out = []; let cur = '', q = false; for (const ch of s) { if (ch === "'") q = !q; if (ch === ',' && !q) { out.push(cur.trim()); cur = ''; } else cur += ch; } if (cur.trim() || out.length) out.push(cur.trim()); return out; };
+const isReserved = n => { const u = n.toUpperCase(); return u in R8 || R16.includes(u) || u in ARITY || u in ALIAS || ['DB','DW','ORG','PROC','ENDP','END'].includes(u); };
+
+function parseOp(tok, varIdx, vars) {
+  const u = tok.toUpperCase();
+  if (R8[u]) return {t:'reg', r:u, size:8};
+  if (R16.includes(u)) return {t:'reg', r:u, size:16};
+  const m = tok.match(/^\[\s*([A-Za-z_]\w*)\s*\]$/), nm = m ? m[1] : (/^[A-Za-z_]\w*$/.test(tok) ? tok : null);
+  if (nm) {
+    const k = nm.toLowerCase();
+    if (k in varIdx) return {t:'mem', i:varIdx[k], name:vars[varIdx[k]].name, size:vars[varIdx[k]].size};
+    throw `“${tok}” không phải thanh ghi, số hay biến đã khai báo (khai báo biến bằng ${nm} DB 0).`;
+  }
+  if (tok.startsWith('[')) throw `Chưa hỗ trợ cách đánh địa chỉ “${tok}”. Hãy dùng [tên_biến].`;
+  const v = parseNum(tok);
+  if (v === null) throw `“${tok}” không phải số, thanh ghi hay biến.`;
+  return {t:'imm', v};
+}
+
+function assemble(src) {
+  const errs = [], vars = [], varIdx = {}, labels = {}, recs = [];
+  const err = (ln, msg) => errs.push(`Dòng ${ln}: ${msg}`);
+  src.split(/\r?\n/).forEach((raw, i) => {
+    const ln = i + 1, ci = commentIdx(raw);
+    let comment = '', line = raw;
+    if (ci >= 0) { comment = raw.slice(ci + 1).trim(); line = raw.slice(0, ci); }
+    line = line.trim();
+    if (!line) return;
+    if (/^\./.test(line) || /^\w+\s+(PROC|ENDP)\b/i.test(line) || /^END(\s+\w+)?$/i.test(line) || /^ORG\b/i.test(line)) return;
+    let label = null;
+    const lm = line.match(/^([A-Za-z_]\w*)\s*:\s*(.*)$/);
+    const dataFrom = (name, size, valTok) => {
+      if (isReserved(name)) return err(ln, `“${name}” trùng tên lệnh hoặc thanh ghi, hãy đặt tên khác.`);
+      if (name.toLowerCase() in varIdx) return err(ln, `biến “${name}” bị khai báo hai lần.`);
+      let v = valTok.trim() === '?' ? 0 : parseNum(valTok.trim());
+      const sz = size.toUpperCase() === 'DB' ? 8 : 16;
+      if (v === null) return err(ln, `giá trị “${valTok}” không phải là số.`);
+      if (v < -SIGN[sz] || v > MASK[sz]) return err(ln, `số ${v} không vừa ${sz} bit.`);
+      varIdx[name.toLowerCase()] = vars.length; vars.push({name, size:sz, val:v & MASK[sz]});
+    };
+    if (lm) {
+      label = lm[1];
+      if (isReserved(label)) err(ln, `“${label}” trùng tên lệnh hoặc thanh ghi, không dùng làm nhãn được.`);
+      if (label.toLowerCase() in labels) err(ln, `nhãn “${label}” bị trùng.`);
+      line = lm[2].trim();
+      const dd = line.match(/^(DB|DW)\s+(.+)$/i);
+      if (dd) { dataFrom(label, dd[1], dd[2]); return; }
+      labels[label.toLowerCase()] = recs.length;
+      if (!line) return;
+    }
+    const dm = line.match(/^([A-Za-z_]\w*)\s+(DB|DW)\s+(.+)$/i);
+    if (dm) { dataFrom(dm[1], dm[2], dm[3]); return; }
+    const sp = line.search(/\s/), mn0 = (sp < 0 ? line : line.slice(0, sp)).toUpperCase(), rest = sp < 0 ? '' : line.slice(sp + 1).trim();
+    recs.push({op0:mn0, rawOps:rest ? splitOps(rest) : [], ln, comment, label});
+  });
+  const code = recs.map(rc => {
+    const op = ALIAS[rc.op0] || rc.op0, ins = {op, ln:rc.ln, comment:rc.comment, label:rc.label, text:''};
+    if (!(op in ARITY)) { err(rc.ln, `không có lệnh “${rc.op0}”. Hãy xem danh sách ở thẻ “Tập lệnh gồm những gì?”.`); return ins; }
+    if (rc.rawOps.length !== ARITY[op]) { err(rc.ln, `${op} cần ${ARITY[op]} toán hạng nhưng bạn viết ${rc.rawOps.length}.`); return ins; }
+    ins.text = op + (rc.rawOps.length ? ' ' + rc.rawOps.join(', ') : '');
+    try {
+      if (isJump(op)) {
+        const k = rc.rawOps[0].toLowerCase();
+        if (!(k in labels)) throw `không tìm thấy nhãn “${rc.rawOps[0]}”.`;
+        ins.tgt = labels[k]; ins.tname = rc.rawOps[0]; return ins;
+      }
+      if (op === 'INT') { const v = parseNum(rc.rawOps[0]); if (v !== 0x21) throw 'chỉ hỗ trợ INT 21h.'; ins.a = {t:'imm', v}; return ins; }
+      const ops = rc.rawOps.map(t => parseOp(t, varIdx, vars));
+      [ins.a, ins.b] = ops;
+      const a = ins.a, b = ins.b;
+      if (ARITY[op] === 2 && ['MOV','ADD','SUB','CMP','AND','OR','XOR','XCHG'].includes(op)) {
+        if (a.t === 'imm') throw `đích của ${op} không thể là một con số.`;
+        if (a.t === 'mem' && b.t === 'mem') throw `${op} không thao tác trực tiếp ô nhớ với ô nhớ. Hãy đưa một bên vào thanh ghi trước.`;
+        if (op === 'XCHG' && b.t === 'imm') throw 'XCHG không dùng với số.';
+        if (a.size && b.size && a.size !== b.size) throw `hai toán hạng khác kích thước (${a.r || a.name}: ${a.size} bit, ${b.r || b.name}: ${b.size} bit).`;
+        ins.size = a.size || b.size;
+        if (b.t === 'imm' && (b.v < -SIGN[ins.size] || b.v > MASK[ins.size])) throw `số ${b.v} không vừa ${ins.size} bit (${a.r || a.name}).`;
+      } else if (['INC','DEC','NEG','NOT','MUL','DIV'].includes(op)) {
+        if (a.t === 'imm') throw `${op} không dùng với một con số, hãy dùng thanh ghi hoặc biến.`;
+        ins.size = a.size;
+      } else if (op === 'PUSH' || op === 'POP') {
+        if (!(a.t === 'reg' && a.size === 16)) throw `${op} chỉ dùng với thanh ghi 16 bit (AX, BX, CX, DX, SI, DI).`;
+        ins.size = 16;
+      } else if (['SHL','SHR','ROL','ROR'].includes(op)) {
+        if (a.t === 'imm') throw `đích của ${op} không thể là một con số.`;
+        if (!((b.t === 'imm' && b.v >= 1 && b.v <= 31) || (b.t === 'reg' && b.r === 'CL'))) throw `số bit dịch phải là số từ 1 đến 31 hoặc thanh ghi CL.`;
+        ins.size = a.size;
+      }
+    } catch (e) { err(rc.ln, typeof e === 'string' ? e : String(e)); }
+    return ins;
+  });
+  return {code, vars, varIdx, labels, errors:errs};
+}
+
+const gr = (st, r) => R8[r] ? (st.r[R8[r][0]] >> R8[r][1]) & 255 : st.r[r];
+const sr = (st, r, v) => { if (R8[r]) { const [b, sh] = R8[r]; st.r[b] = (st.r[b] & ~(255 << sh) & 0xFFFF) | ((v & 255) << sh); } else st.r[r] = v & 0xFFFF; };
+const rd = (st, o, size) => o.t === 'reg' ? gr(st, o.r) : o.t === 'imm' ? o.v & MASK[size] : st.vars[o.i].val;
+const wr = (st, o, v) => { if (o.t === 'reg') sr(st, o.r, v); else st.vars[o.i].val = v & MASK[o.size]; };
+const nm = (o, size) => o.t === 'reg' ? o.r : o.t === 'mem' ? `biến ${o.name}` : `số ${o.v & MASK[size || 16]}`;
+const par = v => { let b = v & 255, c = 0; while (b) { c ^= b & 1; b >>= 1; } return c ? 0 : 1; };
+const szp = (st, res, size) => { st.f.ZF = +((res & MASK[size]) === 0); st.f.SF = (res & SIGN[size]) ? 1 : 0; st.f.PF = par(res); };
+function doAdd(st, a, b, size, keepCF) {
+  const m = MASK[size], raw = a + b, res = raw & m;
+  if (!keepCF) st.f.CF = +(raw > m);
+  st.f.AF = +(((a ^ b ^ res) & 16) !== 0); st.f.OF = +(((a ^ res) & (b ^ res) & SIGN[size]) !== 0); szp(st, res, size); return res;
+}
+function doSub(st, a, b, size, keepCF) {
+  const m = MASK[size], raw = a - b, res = raw & m;
+  if (!keepCF) st.f.CF = +(a < b);
+  st.f.AF = +(((a ^ b ^ res) & 16) !== 0); st.f.OF = +(((a ^ b) & (a ^ res) & SIGN[size]) !== 0); szp(st, res, size); return res;
+}
+const logicFlags = (st, res, size) => { st.f.CF = 0; st.f.OF = 0; st.f.AF = 0; szp(st, res, size); };
+function shifter(st, op, a, n, size) {
+  const m = MASK[size], sign = SIGN[size]; let v = a, cf = st.f.CF;
+  for (let i = 0; i < n; i++) {
+    if (op === 'SHL') { cf = (v & sign) ? 1 : 0; v = (v << 1) & m; }
+    else if (op === 'SHR') { cf = v & 1; v = v >>> 1; }
+    else if (op === 'ROL') { cf = (v & sign) ? 1 : 0; v = ((v << 1) | cf) & m; }
+    else { cf = v & 1; v = (v >>> 1) | (cf ? sign : 0); }
+  }
+  if (n > 0) {
+    st.f.CF = cf;
+    if (op === 'SHL' || op === 'SHR') { szp(st, v, size); st.f.AF = 0; }
+    if (n === 1) {
+      if (op === 'SHL' || op === 'ROL') st.f.OF = ((v & sign) ? 1 : 0) ^ cf;
+      else if (op === 'SHR') st.f.OF = (a & sign) ? 1 : 0;
+      else st.f.OF = ((v & sign) ? 1 : 0) ^ ((v & (sign >> 1)) ? 1 : 0);
+    }
+  }
+  return v;
+}
+const fmtV = (v, size) => `${v} (${hexN(v, size)})`;
+const flagTxt = st => `CF=${st.f.CF} ZF=${st.f.ZF} SF=${st.f.SF} OF=${st.f.OF}`;
+const clone = o => JSON.parse(JSON.stringify(o));
+
+function newState(prog) {
+  return {r:{AX:0, BX:0, CX:0, DX:0, SI:0, DI:0}, f:{CF:0, ZF:0, SF:0, OF:0, PF:0, AF:0}, vars:clone(prog.vars), stack:[], ip:0, out:'', halted:false, err:null, steps:0, last:-1, note:''};
+}
+function exec(st, prog) {
+  if (st.halted) return;
+  const ins = prog.code[st.ip]; st.last = st.ip;
+  const op = ins.op, size = ins.size, a = ins.a, b = ins.b; let next = st.ip + 1, note = '';
+  const fin = (txt) => { note = txt; };
+  switch (op) {
+    case 'MOV': { const v = rd(st, b, size), old = rd(st, a, size); wr(st, a, v);
+      fin(`Chép ${nm(b, size)}${b.t === 'imm' ? '' : ` (= ${v})`} vào ${a.t === 'reg' ? a.r : nm(a)}. Giá trị đổi từ ${old} thành ${v}. MOV không thay đổi cờ.`); break; }
+    case 'ADD': case 'SUB': { const x = rd(st, a, size), y = rd(st, b, size), add = op === 'ADD';
+      const res = add ? doAdd(st, x, y, size) : doSub(st, x, y, size); wr(st, a, res);
+      const raw = add ? x + y : x - y;
+      fin(`${a.r || nm(a)}: ${x} ${add ? '+' : '−'} ${y} = ${raw}` + (add && raw > MASK[size] ? `, vượt quá ${MASK[size]} nên chỉ giữ ${size} bit thấp thành ${res} (CF=1).` : !add && raw < 0 ? `. Vì ${x} < ${y} nên phải “mượn”, kết quả quay vòng thành ${res} (CF=1).` : `.`) + ` Cờ: ${flagTxt(st)}.`); break; }
+    case 'CMP': { const x = rd(st, a, size), y = rd(st, b, size); doSub(st, x, y, size);
+      fin(`So sánh ${a.r || nm(a)} = ${x} với ${y}: tính ${x} − ${y} nhưng bỏ kết quả, chỉ ghi cờ. ${flagTxt(st)}. ` + (x === y ? 'Hai số bằng nhau (ZF=1).' : x < y ? `${x} nhỏ hơn ${y} nếu xét không dấu (CF=1).` : `${x} lớn hơn ${y} nếu xét không dấu (CF=0, ZF=0).`)); break; }
+    case 'AND': case 'OR': case 'XOR': { const x = rd(st, a, size), y = rd(st, b, size), res = op === 'AND' ? x & y : op === 'OR' ? x | y : x ^ y;
+      wr(st, a, res); logicFlags(st, res, size);
+      fin(`Làm ${op} từng bit: ${binN(x, size)} ${op} ${binN(y, size)} = ${binN(res, size)} (${res}, ${hexN(res, size)}). CF và OF bị đặt về 0.`); break; }
+    case 'XCHG': { const x = rd(st, a, size), y = rd(st, b, size); wr(st, a, y); wr(st, b, x);
+      fin(`Hoán đổi: ${a.r || nm(a)} nhận ${y}, ${b.r || nm(b)} nhận ${x}. Không đổi cờ.`); break; }
+    case 'INC': case 'DEC': { const x = rd(st, a, size), inc = op === 'INC', res = inc ? doAdd(st, x, 1, size, true) : doSub(st, x, 1, size, true); wr(st, a, res);
+      fin(`${a.r || nm(a)}: ${x} ${inc ? '+' : '−'} 1 = ${res}${(inc && x === MASK[size]) || (!inc && x === 0) ? ' (quay vòng)' : ''}. INC/DEC không đụng tới CF. Cờ: ${flagTxt(st)}.`); break; }
+    case 'NEG': { const x = rd(st, a, size), res = (-x) & MASK[size]; wr(st, a, res);
+      st.f.CF = +(x !== 0); st.f.OF = +(x === SIGN[size]); st.f.AF = +(((x ^ res) & 16) !== 0); szp(st, res, size);
+      fin(`Đổi dấu (số bù 2): 0 − ${x} = ${res} (${hexN(res, size)}). Nếu hiểu là số có dấu thì bằng ${sgnV(res, size)}.`); break; }
+    case 'NOT': { const x = rd(st, a, size), res = (~x) & MASK[size]; wr(st, a, res);
+      fin(`Đảo từng bit: ${binN(x, size)} → ${binN(res, size)} (${res}). NOT không đổi cờ.`); break; }
+    case 'MUL': { const y = rd(st, a, size);
+      if (size === 8) { const res = gr(st, 'AL') * y; st.r.AX = res & 0xFFFF; st.f.CF = st.f.OF = +(gr(st, 'AH') !== 0); fin(`Nhân AL với ${y}: ${res / y} × ${y} = ${res}. Kết quả 16 bit nằm trong AX (AH = ${gr(st, 'AH')}, AL = ${gr(st, 'AL')}).`); }
+      else { const res = st.r.AX * y; const lo = res % 65536, hi = Math.floor(res / 65536); st.r.AX = lo; st.r.DX = hi; st.f.CF = st.f.OF = +(hi !== 0); fin(`Nhân AX với ${y} = ${res}. Kết quả 32 bit nằm trong DX:AX (DX = ${hi}, AX = ${lo}).`); }
+      break; }
+    case 'DIV': { const y = rd(st, a, size);
+      if (y === 0) { st.err = 'Lỗi chia cho 0 (Divide error). CPU dừng chương trình.'; st.halted = true; break; }
+      if (size === 8) { const dv = st.r.AX, q = Math.floor(dv / y), r = dv % y;
+        if (q > 255) { st.err = `Lỗi chia: thương ${q} không vừa 8 bit (AL). Cần AH nhỏ hơn số chia.`; st.halted = true; break; }
+        st.r.AX = (r << 8) | q; fin(`Chia AX = ${dv} cho ${y}: thương ${q} vào AL, số dư ${r} vào AH.`); }
+      else { const dv = st.r.DX * 65536 + st.r.AX, q = Math.floor(dv / y), r = dv % y;
+        if (q > 65535) { st.err = `Lỗi chia: thương ${q} không vừa 16 bit (AX).`; st.halted = true; break; }
+        st.r.AX = q; st.r.DX = r; fin(`Chia DX:AX = ${dv} cho ${y}: thương ${q} vào AX, số dư ${r} vào DX.`); }
+      break; }
+    case 'PUSH': { st.stack.push(gr(st, a.r)); fin(`Cất ${a.r} = ${gr(st, a.r)} vào đỉnh ngăn xếp (stack).`); break; }
+    case 'POP': { if (!st.stack.length) { st.err = 'POP khi ngăn xếp rỗng.'; st.halted = true; break; } const v = st.stack.pop(); sr(st, a.r, v); fin(`Lấy phần tử đỉnh stack (${v}) bỏ vào ${a.r}.`); break; }
+    case 'SHL': case 'SHR': case 'ROL': case 'ROR': { const x = rd(st, a, size), n = b.t === 'imm' ? b.v : gr(st, 'CL'), res = shifter(st, op, x, n, size); wr(st, a, res);
+      const what = {SHL:'dịch trái (thêm bit 0 vào bên phải)', SHR:'dịch phải (thêm bit 0 vào bên trái)', ROL:'quay trái (bit cao nhảy xuống bit thấp)', ROR:'quay phải (bit thấp nhảy lên bit cao)'}[op];
+      fin(`${what} ${n} bit: ${binN(x, size)} → ${binN(res, size)} (${res})` + (op === 'SHL' ? `. Dịch trái ${n} bit tương đương nhân với 2^${n} = ${2 ** n} (nếu không tràn).` : op === 'SHR' ? `. Dịch phải ${n} bit tương đương chia nguyên cho ${2 ** n}.` : '.') + ` CF = ${st.f.CF} (bit vừa bị đẩy ra).`); break; }
+    case 'JMP': next = ins.tgt; fin(`Nhảy không điều kiện tới nhãn ${ins.tname} (dòng lệnh số ${ins.tgt + 1}).`); break;
+    case 'LOOP': { const cx = (st.r.CX - 1) & 0xFFFF; st.r.CX = cx; if (cx !== 0) { next = ins.tgt; fin(`CX giảm còn ${cx} (khác 0) nên nhảy về ${ins.tname}.`); } else fin('CX giảm về 0 nên thoát vòng lặp, chạy tiếp lệnh bên dưới.'); break; }
+    case 'CALL': { st.stack.push(st.ip + 1); next = ins.tgt; fin(`Gọi chương trình con ${ins.tname}: cất địa chỉ quay về vào stack rồi nhảy tới đó.`); break; }
+    case 'RET': { if (!st.stack.length) { st.err = 'RET khi ngăn xếp rỗng.'; st.halted = true; break; } next = st.stack.pop(); fin('Trở về chỗ đã gọi (lấy địa chỉ quay về từ stack).'); break; }
+    case 'INT': { const ah = gr(st, 'AH');
+      if (ah === 2) { const ch = String.fromCharCode(gr(st, 'DL')); st.out += ch; sr(st, 'AL', gr(st, 'DL')); fin(`INT 21h với AH = 2: hiển thị ký tự có mã ${gr(st, 'DL')} trong DL (“${ch}”) ra màn hình.`); }
+      else if (ah === 0x4C) { st.halted = true; fin('INT 21h với AH = 4Ch: kết thúc chương trình.'); }
+      else { st.err = `INT 21h với AH = ${hexN(ah, 8)} chưa được mô phỏng (chỉ hỗ trợ AH = 2 và AH = 4Ch).`; st.halted = true; }
+      break; }
+    case 'HLT': st.halted = true; fin('CPU dừng (HLT). Chương trình kết thúc.'); break;
+    case 'NOP': fin('Không làm gì cả.'); break;
+    default:
+      if (op in JCC) { const take = !!JCC[op](st); if (take) next = ins.tgt;
+        fin(`Kiểm tra điều kiện của ${op} (${flagTxt(st)}): ${take ? `đúng nên nhảy tới ${ins.tname}` : 'sai nên không nhảy, chạy lệnh kế tiếp'}.`); }
+  }
+  st.steps++; st.note = note || st.note;
+  if (!st.halted) {
+    if (next < 0 || next >= prog.code.length) { st.halted = true; st.ip = prog.code.length; st.endNote = 'Hết chương trình: không còn lệnh nào để chạy.'; }
+    else st.ip = next;
+    if (st.steps >= MAXSTEPS && !st.halted) { st.halted = true; st.err = `Đã chạy ${MAXSTEPS} lệnh mà chưa dừng, có thể chương trình lặp vô hạn.`; }
+  }
+}
+function runAll(prog) {
+  const st = newState(prog), trace = [];
+  while (!st.halted && st.ip < prog.code.length) { const before = clone(st), i = st.ip; exec(st, prog); trace.push({ins:prog.code[i], note:st.note, before, after:clone(st)}); }
+  return {st, trace};
+}
+
+/* =====================================================================
+   2. TRÌNH BIÊN DỊCH  a = b + c  →  Assembly
+   ===================================================================== */
+function tokenize(s) {
+  const toks = []; let i = 0;
+  while (i < s.length) {
+    const ch = s[i];
+    if (/\s/.test(ch)) { i++; continue; }
+    let m;
+    if ((m = s.slice(i).match(/^(0x[0-9a-fA-F]+|[0-9][0-9a-fA-F]*[hH]\b|\d+)/))) { const t = m[1], v = /^0x/i.test(t) ? parseInt(t, 16) : /h$/i.test(t) ? parseInt(t, 16) : parseInt(t, 10); toks.push({t:'num', v}); i += t.length; continue; }
+    if ((m = s.slice(i).match(/^'(.)'/))) { toks.push({t:'num', v:m[1].charCodeAt(0)}); i += 3; continue; }
+    if ((m = s.slice(i).match(/^[A-Za-z_]\w*/))) { toks.push({t:'id', v:m[0]}); i += m[0].length; continue; }
+    if ((m = s.slice(i).match(/^(\+\+|--|\+=|-=|\*=|\/=|%=|[=+\-*/%()])/))) { toks.push({t:'op', v:m[1]}); i += m[1].length; continue; }
+    throw `ký tự lạ “${ch}”`;
+  }
+  return toks;
+}
+function parseStmt(line) {
+  const toks = tokenize(line); let p = 0;
+  const peek = () => toks[p], take = () => toks[p++];
+  const prim = () => {
+    const t = take();
+    if (!t) throw 'thiếu vế phải của biểu thức';
+    if (t.t === 'num') return {k:'num', v:t.v};
+    if (t.t === 'id') return {k:'var', n:t.v};
+    if (t.v === '(') { const e = expr(); const c = take(); if (!c || c.v !== ')') throw 'thiếu dấu đóng ngoặc )'; return e; }
+    throw `không hiểu “${t.v}” ở vị trí này`;
+  };
+  const unary = () => { const t = peek(); if (t && t.t === 'op' && t.v === '-') { take(); const x = unary(); return x.k === 'num' ? {k:'num', v:-x.v} : {k:'neg', x}; } return prim(); };
+  const term = () => { let l = unary(); while (peek() && peek().t === 'op' && '*/%'.includes(peek().v) && peek().v.length === 1) { const o = take().v; l = {k:'bin', op:o, l, r:unary()}; } return l; };
+  const expr = () => { let l = term(); while (peek() && peek().t === 'op' && (peek().v === '+' || peek().v === '-')) { const o = take().v; l = {k:'bin', op:o, l, r:term()}; } return l; };
+  const t0 = take();
+  if (!t0 || t0.t !== 'id') throw 'mỗi câu phải bắt đầu bằng tên biến, ví dụ a = b + c';
+  const t1 = take();
+  if (!t1) throw `thiếu dấu = sau “${t0.v}”`;
+  let st;
+  if (t1.v === '++' || t1.v === '--') st = {kind:'incdec', n:t0.v, op:t1.v};
+  else if (['=', '+=', '-=', '*=', '/=', '%='].includes(t1.v)) {
+    const e = expr();
+    st = {kind:'assign', n:t0.v, e: t1.v === '=' ? e : {k:'bin', op:t1.v[0], l:{k:'var', n:t0.v}, r:e}};
+  } else throw `sau “${t0.v}” cần dấu = (hoặc ++ / --), không phải “${t1.v}”`;
+  if (p < toks.length) throw `thừa “${toks[p].v}” ở cuối câu`;
+  return st;
+}
+const exprStr = e => e.k === 'num' ? String(e.v) : e.k === 'var' ? e.n : e.k === 'neg' ? '-' + exprStr(e.x) : `(${exprStr(e.l)} ${e.op} ${exprStr(e.r)})`;
+function evalExpr(e, env) {
+  if (e.k === 'num') return e.v;
+  if (e.k === 'var') return env[e.n.toLowerCase()] ?? 0;
+  if (e.k === 'neg') return -evalExpr(e.x, env);
+  const l = evalExpr(e.l, env), r = evalExpr(e.r, env);
+  switch (e.op) { case '+': return l + r; case '-': return l - r; case '*': return l * r;
+    case '/': if (r === 0) throw 'chia cho 0'; return Math.trunc(l / r); case '%': if (r === 0) throw 'chia cho 0'; return l % r; }
+}
+
+function compile(srcText, size, init) {
+  const out = {errors:[], stmts:[], names:[], asm:'', expected:{}, size};
+  const A = size === 8 ? 'AL' : 'AX', TEMPS = size === 8 ? ['BL','CL','DL'] : ['BX','CX','SI','DI'], DB = size === 8 ? 'DB' : 'DW';
+  const lines = srcText.split(/\r?\n/).flatMap(l => l.replace(/\/\/.*$/, '').split(';')).map(l => l.trim()).filter(Boolean);
+  const names = [], seen = {}, readFirst = {}, assigned = {};
+  const touch = (n, reading) => { const k = n.toLowerCase(); if (!(k in seen)) { seen[k] = n; names.push(n); if (reading && !assigned[k]) readFirst[k] = true; } };
+  const walkReads = e => { if (e.k === 'var') touch(e.n, true); else if (e.k === 'neg') walkReads(e.x); else if (e.k === 'bin') { walkReads(e.l); walkReads(e.r); } };
+  const parsed = [];
+  lines.forEach((l, i) => {
+    try {
+      const st = parseStmt(l);
+      if (isReserved(st.n)) throw `“${st.n}” trùng tên thanh ghi hoặc lệnh, hãy đặt tên biến khác`;
+      if (st.kind === 'assign') { walkReads(st.e); touch(st.n, false); assigned[st.n.toLowerCase()] = true; }
+      else { touch(st.n, true); assigned[st.n.toLowerCase()] = true; }
+      parsed.push({st, src:l});
+    } catch (e) { out.errors.push(`Câu ${i + 1} (“${l}”): ${e}.`); }
+  });
+  if (out.errors.length) return out;
+  if (!parsed.length) { out.errors.push('Hãy gõ ít nhất một câu, ví dụ a = b + c'); return out; }
+  for (const n of names) if (isReserved(n)) { out.errors.push(`Tên biến “${n}” trùng thanh ghi hoặc lệnh.`); return out; }
+  out.names = names; out.readFirst = readFirst;
+  const dflt = [5, 3, 2, 4, 6, 1, 7, 8]; let di = 0;
+  const initV = {};
+  names.forEach(n => { const k = n.toLowerCase(); initV[k] = k in init ? init[k] : (readFirst[k] ? dflt[di++ % dflt.length] : 0); });
+  out.init = initV;
+  const mem = n => `[${n}]`;
+  // sinh mã
+  const gen = (e, d, L) => {
+    const emit = (c, cm) => L.push({c, cm});
+    const leaf = x => x.k === 'num' || x.k === 'var';
+    const opd = x => x.k === 'num' ? String(x.v) : mem(x.n);
+    const desc = x => x.k === 'num' ? String(x.v) : x.n;
+    if (e.k === 'num') { emit(`MOV ${A}, ${e.v}`, `${A} ← ${e.v}`); return; }
+    if (e.k === 'var') { emit(`MOV ${A}, ${mem(e.n)}`, `${A} ← ${e.n}`); return; }
+    if (e.k === 'neg') { gen(e.x, d, L); emit(`NEG ${A}`, `đổi dấu ${A}`); return; }
+    const apply = (op, X, xdesc) => {
+      if (d >= TEMPS.length && !(X.startsWith('[') || /^-?\d/.test(X)) ) throw 'biểu thức quá phức tạp, hãy tách thành nhiều câu';
+      if (op === '+') emit(`ADD ${A}, ${X}`, `${A} ← ${A} + ${xdesc}`);
+      else if (op === '-') emit(`SUB ${A}, ${X}`, `${A} ← ${A} − ${xdesc}`);
+      else {
+        let Y = X;
+        if (/^-?\d/.test(X)) { if (d >= TEMPS.length) throw 'biểu thức quá phức tạp, hãy tách thành nhiều câu'; Y = TEMPS[d]; emit(`MOV ${Y}, ${X}`, `MUL/DIV không nhận số trực tiếp nên đưa ${X} vào ${Y}`); }
+        if (op === '*') emit(`MUL ${Y}`, size === 8 ? `AX ← AL × ${xdesc} (giữ AL)` : `DX:AX ← AX × ${xdesc} (giữ AX)`);
+        else {
+          emit(size === 8 ? 'MOV AH, 0' : 'MOV DX, 0', size === 8 ? 'xóa AH vì DIV chia cả AX' : 'xóa DX vì DIV chia cả DX:AX');
+          emit(`DIV ${Y}`, size === 8 ? `AL ← AX / ${xdesc}, AH ← số dư` : `AX ← DX:AX / ${xdesc}, DX ← số dư`);
+          if (op === '%') emit(size === 8 ? 'MOV AL, AH' : 'MOV AX, DX', 'lấy số dư làm kết quả');
+        }
+      }
+    };
+    const comm = e.op === '+' || e.op === '*';
+    if (leaf(e.r)) { gen(e.l, d, L); apply(e.op, opd(e.r), desc(e.r)); }
+    else if (leaf(e.l) && comm) { gen(e.r, d, L); apply(e.op, opd(e.l), desc(e.l)); }
+    else {
+      if (d >= TEMPS.length) throw 'biểu thức quá phức tạp, hãy tách thành nhiều câu';
+      gen(e.r, d, L); emit(`MOV ${TEMPS[d]}, ${A}`, `cất tạm vế phải vào ${TEMPS[d]}`);
+      gen(e.l, d + 1, L); apply(e.op, TEMPS[d], 'vế phải đã cất');
+    }
+  };
+  const env = {}; names.forEach(n => env[n.toLowerCase()] = initV[n.toLowerCase()]);
+  const lo = size === 8 ? -128 : -32768, hi = size === 8 ? 255 : 65535;
+  for (const {st, src} of parsed) {
+    const L = [];
+    try {
+      if (st.kind === 'incdec') { L.push({c:`${st.op === '++' ? 'INC' : 'DEC'} ${mem(st.n)}`, cm:`${st.n} ← ${st.n} ${st.op === '++' ? '+' : '−'} 1 (làm thẳng trên ô nhớ)`}); env[st.n.toLowerCase()] = (env[st.n.toLowerCase()] ?? 0) + (st.op === '++' ? 1 : -1); }
+      else {
+        const e = st.e;
+        if (e.k === 'num') { if (e.v < lo || e.v > hi) throw `số ${e.v} không vừa ${size} bit`; L.push({c:`MOV ${mem(st.n)}, ${e.v}`, cm:`${st.n} ← ${e.v} (số gán thẳng vào ô nhớ)`}); }
+        else { gen(e, 0, L); L.push({c:`MOV ${mem(st.n)}, ${A}`, cm:`${st.n} ← ${A} (cất kết quả vào ô nhớ)`}); }
+        const num = (x) => { if (x.k === 'num' && (x.v < lo || x.v > hi)) throw `số ${x.v} không vừa ${size} bit`; if (x.k === 'neg') num(x.x); if (x.k === 'bin') { num(x.l); num(x.r); } };
+        num(e);
+        const real = evalExpr(e, env); env[st.n.toLowerCase()] = real;
+      }
+    } catch (ex) { out.errors.push(`Câu “${src}”: ${typeof ex === 'string' ? ex : ex.message}.`); }
+    out.stmts.push({src, lines:L, kind:st.kind});
+  }
+  if (out.errors.length) return out;
+  // giá trị thật theo toán học (không tràn) để so sánh
+  const env2 = {}; names.forEach(n => env2[n.toLowerCase()] = initV[n.toLowerCase()]);
+  try { for (const {st} of parsed) { if (st.kind === 'incdec') env2[st.n.toLowerCase()] += st.op === '++' ? 1 : -1; else env2[st.n.toLowerCase()] = evalExpr(st.e, env2); } out.expected = env2; }
+  catch (e) { out.expected = null; out.expErr = String(e); }
+  const pad = s => s.padEnd(18);
+  out.asm = `; ===== Dữ liệu (biến nằm trong RAM) =====\n` + names.map(n => `${n} ${DB} ${initV[n.toLowerCase()] & MASK[size]}`).join('\n') +
+    `\n\n; ===== Mã lệnh =====\n` + out.stmts.map(s => `; ${s.src}\n` + s.lines.map(l => pad(l.c) + '; ' + l.cm).join('\n')).join('\n') + `\n${pad('HLT')}; dừng CPU`;
+  return out;
+}
+
+/* =====================================================================
+   3. DỮ LIỆU GIỚI THIỆU TẬP LỆNH
+   ===================================================================== */
+const GROUPS = [
+  {id:'move', name:'Chuyển dữ liệu', color:'--c-move', lead:'Sao chép dữ liệu giữa thanh ghi, số và ô nhớ. Đây là nhóm lệnh dùng nhiều nhất.', rows:[
+    {syn:'MOV đích, nguồn', what:'Chép nguồn vào đích. Nguồn giữ nguyên; MOV không thay đổi cờ.', ex:'MOV AL, 5\nMOV BL, AL\nMOV CX, 1234h', see:'BL nhận bản sao của AL (AL vẫn bằng 5). Ghi vào CX thì cả CH và CL cùng đổi.', flags:'không đổi cờ'},
+    {syn:'XCHG đích, nguồn', what:'Hoán đổi nội dung hai toán hạng.', ex:'MOV AL, 1\nMOV BL, 2\nXCHG AL, BL', see:'Sau lệnh, AL = 2 và BL = 1.', flags:'không đổi cờ'},
+    {syn:'PUSH nguồn', what:'Cất một thanh ghi 16 bit vào đỉnh ngăn xếp (stack).', ex:'MOV AX, 1234h\nPUSH AX\nMOV AX, 0\nPOP AX', see:'Stack giống chồng đĩa: PUSH đặt lên trên, POP lấy từ trên xuống. AX được khôi phục về 1234h.', flags:'không đổi cờ'},
+    {syn:'POP đích', what:'Lấy phần tử trên cùng của stack bỏ vào thanh ghi 16 bit.', ex:'MOV AX, 7\nMOV BX, 9\nPUSH AX\nPUSH BX\nPOP AX\nPOP BX', see:'Vào sau ra trước: AX nhận 9, BX nhận 7, tức đã hoán đổi hai thanh ghi.', flags:'không đổi cờ'}
+  ]},
+  {id:'arith', name:'Số học', color:'--c-arith', lead:'Cộng, trừ, nhân, chia và so sánh. Hầu hết các lệnh này cập nhật cờ.', rows:[
+    {syn:'ADD đích, nguồn', what:'Cộng nguồn vào đích: đích = đích + nguồn.', ex:'MOV AL, 5\nADD AL, 3', see:'AL = 8. Cờ ZF=0 vì khác 0, CF=0 vì không tràn.', flags:'CF ZF SF OF PF AF'},
+    {syn:'ADD khi bị tràn', what:'Thanh ghi 8 bit chỉ chứa 0 đến 255. Kết quả lớn hơn sẽ quay vòng và bật CF.', ex:'MOV AL, 250\nADD AL, 10', see:'250 + 10 = 260 nhưng AL chỉ giữ 8 bit thấp nên AL = 4 và CF = 1.', flags:'CF ZF SF OF PF AF'},
+    {syn:'SUB đích, nguồn', what:'Trừ nguồn khỏi đích: đích = đích − nguồn.', ex:'MOV AL, 5\nSUB AL, 7', see:'5 − 7 không có số âm trong không dấu nên quay vòng thành 254 (FEh), CF = 1 (phải mượn).', flags:'CF ZF SF OF PF AF'},
+    {syn:'INC đích', what:'Tăng toán hạng thêm 1 (nhanh gọn hơn ADD đích, 1). Không đổi CF.', ex:'MOV CL, 9\nINC CL\nDEC CL\nDEC CL', see:'CL đi 9 → 10 → 9 → 8.', flags:'ZF SF OF PF AF (không CF)'},
+    {syn:'DEC đích', what:'Giảm toán hạng đi 1. Không đổi CF.', ex:'MOV AL, 0\nDEC AL', see:'0 − 1 quay vòng thành 255 (FFh).', flags:'ZF SF OF PF AF (không CF)'},
+    {syn:'NEG đích', what:'Đổi dấu (lấy số bù 2): đích = 0 − đích.', ex:'MOV DL, 9\nNEG DL', see:'DL = F7h (247). Với số có dấu, F7h chính là −9.', flags:'CF ZF SF OF PF AF'},
+    {syn:'MUL nguồn', what:'Nhân không dấu. Toán hạng còn lại ngầm định là AL (nguồn 8 bit) hoặc AX (nguồn 16 bit). Chỉ có MỘT toán hạng ghi trong lệnh.', ex:'MOV AL, 6\nMOV BL, 7\nMUL BL', see:'AX = AL × BL = 42. Kết quả 8 bit × 8 bit cần 16 bit nên nằm trong AX.', flags:'CF OF (=1 khi nửa cao khác 0)'},
+    {syn:'DIV nguồn', what:'Chia không dấu. Số bị chia ngầm định là AX (nguồn 8 bit): thương vào AL, số dư vào AH.', ex:'MOV AX, 13\nMOV DL, 5\nDIV DL', see:'13 ÷ 5 = 2 dư 3, nên AL = 2 và AH = 3. Chia cho 0 hoặc thương quá lớn sẽ gây lỗi.', flags:'không xác định'},
+    {syn:'CMP đích, nguồn', what:'So sánh bằng cách trừ nhưng bỏ kết quả, chỉ cập nhật cờ. Luôn đi kèm lệnh nhảy có điều kiện.', ex:'MOV AL, 3\nCMP AL, 5', see:'AL vẫn bằng 3. Cờ CF = 1 báo hiệu 3 nhỏ hơn 5 (không dấu).', flags:'CF ZF SF OF PF AF'}
+  ]},
+  {id:'logic', name:'Logic theo bit', color:'--c-logic', lead:'Tác động lên từng bit riêng lẻ, rất hay dùng để bật, tắt, đảo bit.', rows:[
+    {syn:'AND đích, nguồn', what:'Bit kết quả = 1 chỉ khi cả hai bit đều là 1. Dùng để <b>xóa</b> bit (mặt nạ 0).', ex:'MOV AL, 39h\nAND AL, 0Fh', see:'39h là mã ASCII của ký tự ‘9’. AND với 0Fh xóa nửa cao, còn AL = 09h tức số 9.', flags:'ZF SF PF (CF=OF=0)'},
+    {syn:'OR đích, nguồn', what:'Bit kết quả = 1 nếu ít nhất một bit là 1. Dùng để <b>bật</b> bit.', ex:'MOV DL, 9\nOR DL, 30h', see:'09h OR 30h = 39h: biến chữ số 9 thành ký tự ASCII ‘9’.', flags:'ZF SF PF (CF=OF=0)'},
+    {syn:'XOR đích, nguồn', what:'Bit kết quả = 1 khi hai bit khác nhau. XOR một thanh ghi với chính nó là cách nhanh nhất để đặt về 0.', ex:'MOV BX, 1234h\nXOR BX, BX', see:'BX = 0000h và ZF = 1.', flags:'ZF SF PF (CF=OF=0)'},
+    {syn:'NOT đích', what:'Đảo mọi bit (0 thành 1, 1 thành 0).', ex:'MOV AL, 0Fh\nNOT AL', see:'0000 1111 đảo thành 1111 0000 nên AL = F0h.', flags:'không đổi cờ'}
+  ]},
+  {id:'shift', name:'Dịch và quay bit', color:'--c-shift', lead:'Dời các bit sang trái hoặc phải. Dịch trái n bit = nhân với 2ⁿ; dịch phải n bit = chia nguyên cho 2ⁿ.', rows:[
+    {syn:'SHL đích, số bit', what:'Dịch trái, bit trống bên phải điền 0, bit đẩy ra khỏi bên trái vào CF. Số bit là số cụ thể hoặc thanh ghi CL.', ex:'MOV BX, 2\nMOV CL, 4\nSHL BX, CL', see:'2 × 2⁴ = 32.', flags:'CF ZF SF PF'},
+    {syn:'SHR đích, số bit', what:'Dịch phải (không dấu), bit trống bên trái điền 0.', ex:'MOV AL, 40\nSHR AL, 3', see:'40 ÷ 2³ = 5.', flags:'CF ZF SF PF'},
+    {syn:'ROL đích, số bit', what:'Quay trái: bit đẩy ra bên trái được đưa vòng xuống bên phải, không mất bit nào.', ex:'MOV BX, 1234h\nMOV CL, 4\nROL BX, CL', see:'Quay 4 bit = một chữ số hex: 1234h thành 2341h.', flags:'CF'},
+    {syn:'ROR đích, số bit', what:'Quay phải: bit thấp nhảy lên vị trí cao nhất.', ex:'MOV AL, 0Fh\nROR AL, 1', see:'0000 1111 quay phải 1 bit thành 1000 0111 = 87h.', flags:'CF'}
+  ]},
+  {id:'ctrl', name:'Rẽ nhánh, vòng lặp, chương trình con', color:'--c-ctrl', lead:'Mặc định CPU chạy lệnh từ trên xuống dưới. Các lệnh này cho phép nhảy sang chỗ khác.', rows:[
+    {syn:'JMP nhãn', what:'Nhảy không điều kiện tới dòng có nhãn.', ex:'MOV AL, 1\nJMP bo_qua\nMOV AL, 99\nbo_qua: ADD AL, 1', see:'Dòng MOV AL, 99 bị bỏ qua nên AL = 2.', flags:'không đổi cờ'},
+    {syn:'CMP + JE / JNE', what:'JE nhảy nếu bằng (ZF=1), JNE nhảy nếu khác (ZF=0). JZ, JNZ là tên khác của JE, JNE.', ex:'MOV AL, 5\nCMP AL, 5\nJE bang\nMOV DL, 0\nJMP xong\nbang: MOV DL, 1\nxong: HLT', see:'AL bằng 5 nên nhảy tới bang, DL = 1.', flags:'đọc ZF'},
+    {syn:'JA / JB / JAE / JBE', what:'So sánh <b>số không dấu</b>: A = lớn hơn (Above), B = nhỏ hơn (Below).', ex:'MOV AL, 200\nMOV BL, 100\nCMP AL, BL\nJA lon\nMOV DL, 0\nJMP xong\nlon: MOV DL, 1\nxong: HLT', see:'Không dấu, 200 > 100 nên nhảy. DL = 1.', flags:'đọc CF, ZF'},
+    {syn:'JG / JL / JGE / JLE', what:'So sánh <b>số có dấu</b>: G = lớn hơn (Greater), L = nhỏ hơn (Less). Không thay thế được cho JA / JB.', ex:'MOV AL, 200\nMOV BL, 100\nCMP AL, BL\nJG lon\nMOV DL, 0\nJMP xong\nlon: MOV DL, 1\nxong: HLT', see:'Có dấu, 200 (= −56) nhỏ hơn 100 nên KHÔNG nhảy, DL = 0. Cùng cặp số nhưng JA và JG cho kết quả ngược nhau.', flags:'đọc SF, OF, ZF'},
+    {syn:'LOOP nhãn', what:'Giảm CX đi 1; nếu CX khác 0 thì nhảy về nhãn. Muốn lặp n lần, đặt CX = n trước vòng lặp.', ex:'MOV AL, 0\nMOV CX, 5\nlap: ADD AL, 2\nLOOP lap', see:'Cộng 2 vào AL năm lần: AL = 10, CX = 0.', flags:'không đổi cờ'},
+    {syn:'CALL nhãn / RET', what:'CALL gọi chương trình con (cất địa chỉ quay về vào stack rồi nhảy). RET trở về ngay sau lệnh CALL.', ex:'MOV AL, 3\nCALL gap_doi\nHLT\ngap_doi: ADD AL, AL\nRET', see:'Chương trình con nhân đôi AL: AL = 6. HLT chặn không cho chạy tràn vào chương trình con.', flags:'không đổi cờ'}
+  ]},
+  {id:'io', name:'Vào / ra', color:'--c-io', lead:'Trao đổi với bàn phím, màn hình và thiết bị ngoại vi.', rows:[
+    {syn:'INT 21h (hàm AH = 2)', what:'Gọi ngắt DOS để hiển thị một ký tự có mã ASCII nằm trong DL. Hàm 1 nhập một ký tự từ bàn phím (vào AL) và hàm 9 hiển thị một chuỗi, hai hàm này chưa mô phỏng ở đây.', ex:"MOV CX, 5\nMOV AH, 2\nMOV DL, '*'\nlap: INT 21h\nLOOP lap", see:'Màn hình hiện ra năm dấu * (xem khung “Màn hình” ở máy ảo).', flags:'không đổi cờ'},
+    {syn:'IN / OUT (giới thiệu)', what:'Đọc / ghi trực tiếp một cổng thiết bị. IN AL, 80h đọc cổng 80h vào AL; OUT 81h, AL ghi AL ra cổng 81h. Chỉ dùng thanh ghi AL (hoặc AX) làm bên trao đổi dữ liệu. Chưa mô phỏng.', ex:'', see:'', flags:'không đổi cờ', noTry:true}
+  ]}
+];
+
+/* =====================================================================
+   4. MÁY ẢO (giao diện)
+   ===================================================================== */
+const run = {prog:null, hist:[], idx:0, playing:false, timer:null, locked:false, label:'', src:''};
+const curSt = () => run.hist[run.idx];
+function buildRegs() {
+  const mkBits = id => `<div class="bits" id="bits-${id}">${'<span class="bit">0</span>'.repeat(8)}</div>`;
+  $('#regs').innerHTML = ['AX','BX','CX','DX'].map(r => {
+    const h = r[0] + 'H', l = r[0] + 'L';
+    return `<div class="reg" id="reg-${r}"><div class="reg-h"><b>${r}</b><span class="rx" id="rx-${r}">0000h</span><span class="rd" id="rd-${r}">0</span></div>
+      <div class="bytes"><div class="byte" id="by-${h}"><label><span>${h}</span><span class="bd" id="bd-${h}">0</span></label><span class="bv" id="bv-${h}">00</span>${mkBits(h)}</div>
+      <div class="byte" id="by-${l}"><label><span>${l}</span><span class="bd" id="bd-${l}">0</span></label><span class="bv" id="bv-${l}">00</span>${mkBits(l)}</div></div></div>`;
+  }).join('') + ['SI','DI'].map(r => `<div class="reg small" id="reg-${r}"><div class="reg-h"><b>${r}</b><span class="rx" id="rx-${r}">0000h</span><span class="rd" id="rd-${r}">0</span></div></div>`).join('');
+  $('#flags').innerHTML = '<b>Cờ:</b>' + ['CF','ZF','SF','OF','PF','AF'].map(f => `<div class="fl" id="fl-${f}"><i>0</i>${f}</div>`).join('');
+}
+function pop(el) { if (calm) return; el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+function setBits(id, v, prev) {
+  const bits = $$('#bits-' + id + ' .bit');
+  bits.forEach((b, i) => { const bit = (v >> (7 - i)) & 1; b.textContent = bit; b.classList.toggle('on', !!bit); if (prev != null && ((prev >> (7 - i)) & 1) !== bit && !calm) { b.classList.remove('flip'); void b.offsetWidth; b.classList.add('flip'); } });
+}
+function renderMachine() {
+  const st = curSt(), prev = run.idx > 0 ? run.hist[run.idx - 1] : null;
+  ['AX','BX','CX','DX'].forEach(r => {
+    const hR = r[0] + 'H', lR = r[0] + 'L', v = st.r[r], hv = v >> 8, lv = v & 255, pv = prev ? prev.r[r] : v;
+    $('#rx-' + r).textContent = hexN(v, 16); $('#rd-' + r).textContent = v;
+    [[hR, hv, pv >> 8], [lR, lv, pv & 255]].forEach(([n, val, pval]) => {
+      $('#bv-' + n).textContent = hexN(val, 8).replace('h', ''); $('#bd-' + n).textContent = val;
+      setBits(n, val, prev ? pval : null);
+      const box = $('#by-' + n), ch = prev && pval !== val; box.classList.toggle('chg', !!ch); if (ch) pop(box);
+    });
+  });
+  ['SI','DI'].forEach(r => { $('#rx-' + r).textContent = hexN(st.r[r], 16); $('#rd-' + r).textContent = st.r[r]; });
+  ['CF','ZF','SF','OF','PF','AF'].forEach(f => { const on = st.f[f], el = $('#fl-' + f); el.classList.toggle('on', !!on); el.querySelector('i').textContent = on; el.classList.toggle('chg', !!prev && prev.f[f] !== on); });
+  $('#mem').innerHTML = st.vars.length ? '<h4>Bộ nhớ (biến)</h4>' + st.vars.map((v, i) => `<div class="memrow ${prev && prev.vars[i].val !== v.val ? 'chg' : ''}"><span class="mn">${v.name}</span><span class="ms">${v.size === 8 ? 'DB' : 'DW'}</span><span class="mv">${v.val} (${hexN(v.val, v.size)})</span></div>`).join('') : '';
+  $('#stk').textContent = st.stack.length ? 'Stack (đỉnh bên phải): ' + st.stack.map(x => hexN(x, 16)).join('  ') : '';
+  $('#screen').hidden = !(st.out.length || (run.prog && run.prog.code.some(c => c.op === 'INT')));
+  $('#scrTxt').textContent = st.out;
+  // listing
+  const L = $('#listing');
+  L.innerHTML = run.prog.code.length ? run.prog.code.map((c, i) => `<div class="lrow ${i === st.ip && !st.halted ? 'next' : i === st.last && run.idx > 0 ? 'last' : ''}" data-i="${i}"><span class="ln">${i + 1}</span>${c.label ? `<span class="lb">${c.label}:</span>` : ''}<span class="li">${c.text}</span><span class="lc">${c.comment || ''}</span><span class="mk">${i === st.ip && !st.halted ? 'sắp chạy' : 'vừa chạy'}</span></div>`).join('') : '<div class="lrow">Chưa có lệnh nào.</div>';
+  const cur = L.querySelector('.next') || L.querySelector('.last'); if (cur) cur.scrollIntoView({block:'nearest'});
+  // diễn giải
+  const nar = $('#rNar');
+  if (run.idx === 0) nar.innerHTML = 'Bấm <b>Bước</b> để chạy từng dòng. Thanh ghi nào đổi giá trị sẽ được tô sáng.';
+  else { const ins = run.prog.code[st.last]; nar.innerHTML = `<b>Dòng ${st.last + 1}: ${ins.text}</b><br>${st.note}`; }
+  const em = $('#rEnd2');
+  if (st.err) { em.hidden = false; em.className = 'endmsg err'; em.textContent = st.err; }
+  else if (st.halted) { em.hidden = false; em.className = 'endmsg done'; em.textContent = st.endNote || 'Chương trình đã kết thúc.'; }
+  else em.hidden = true;
+  const over = st.halted || run.locked || !run.prog.code.length;
+  $('#rStep').disabled = over; $('#rAuto').disabled = over && !run.playing; $('#rEnd').disabled = over; $('#rBack').disabled = run.idx === 0 || run.locked; $('#rReset').disabled = run.locked;
+  $('#rAuto').textContent = run.playing ? '⏸ Dừng' : '⏵ Tự chạy';
+}
+function showErrs(errs) { const e = $('#rErr'); if (errs && errs.length) { e.hidden = false; e.innerHTML = `<b>Chưa nạp được mã:</b><ul>${[...new Set(errs)].map(x => `<li>${x}</li>`).join('')}</ul>`; } else e.hidden = true; }
+function loadRunner(src, label, opts = {}) {
+  stopAuto();
+  const p = assemble(src);
+  run.label = label; run.src = src; $('#rSrc').textContent = label; $('#rTxt').value = src;
+  run.locked = !!opts.locked; $('#rLock').hidden = !run.locked; $('#rEditBtn').hidden = run.locked;
+  if (run.locked) $('#rEdit').hidden = true;
+  if (p.errors.length) { showErrs(p.errors); if (!run.prog) { run.prog = {code:[], vars:[]}; run.hist = [newState(run.prog)]; run.idx = 0; renderMachine(); } $('#rEdit').hidden = run.locked; return false; }
+  showErrs([]); run.prog = p; run.hist = [newState(p)]; run.idx = 0;
+  if (p.vars.length === 0 && !p.code.length) { renderMachine(); return true; }
+  renderMachine(); return true;
+}
+function stepOnce() {
+  if (run.locked) return false; const st = curSt(); if (st.halted || !run.prog.code.length) return false;
+  const n = clone(st); exec(n, run.prog);
+  run.hist.length = run.idx + 1; run.hist.push(n); run.idx++; if (run.hist.length > 6000) { run.hist.shift(); run.idx--; }
+  renderMachine(); return !n.halted;
+}
+function stopAuto() { run.playing = false; clearTimeout(run.timer); }
+function autoTick() { if (!run.playing) return; const more = stepOnce(); if (more) run.timer = setTimeout(autoTick, +$('#rSpeed').value); else { run.playing = false; renderMachine(); } }
+function runEnd() { if (run.locked) return; stopAuto(); run.hist.length = run.idx + 1; const st = clone(curSt()); let n = 0; while (!st.halted && n++ < MAXSTEPS + 5) { exec(st, run.prog); run.hist.push(clone(st)); } run.idx = run.hist.length - 1; renderMachine(); }
+function tryExample(src, label) {
+  loadRunner(src, label); $('#rEdit').hidden = true;
+  const s = $('.side'); if (innerWidth <= 1100) s.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+/* =====================================================================
+   5. GIAO DIỆN GIỚI THIỆU
+   ===================================================================== */
+function buildCatalog() {
+  $('#catalog').innerHTML = GROUPS.map((g, gi) => `<div class="card group" data-open="${gi === 0}" id="grp-${g.id}">
+    <button class="ghead" type="button" aria-expanded="${gi === 0}"><span class="gdot" style="background:var(${g.color})"></span><b>${g.name}</b><span class="cnt">${g.rows.length} lệnh</span><span class="chev">▶</span></button>
+    <div class="gbody"><p class="glead">${g.lead}</p>${g.rows.map((r, ri) => `<div class="ins"><div class="ins-top"><span class="ins-syn" style="color:var(${g.color})">${r.syn}</span><span class="tag">cờ: ${r.flags}</span>${r.noTry ? '' : `<button class="btn small try" type="button" data-g="${gi}" data-r="${ri}">▶ Thử trong máy ảo</button>`}</div>
+      <p>${r.what}</p>${r.ex ? `<pre>${r.ex.replace(/</g, '&lt;')}</pre>` : ''}${r.see ? `<p class="see">→ ${r.see}</p>` : ''}</div>`).join('')}</div></div>`).join('');
+  $$('.ghead').forEach(b => b.onclick = () => { const g = b.parentElement, o = g.dataset.open !== 'true'; g.dataset.open = o; b.setAttribute('aria-expanded', o); });
+  $$('.try').forEach(b => b.onclick = () => { const r = GROUPS[+b.dataset.g].rows[+b.dataset.r]; tryExample(r.ex, 'Ví dụ: ' + r.syn); });
+}
+function buildExplorer() {
+  const bits = id => { const e = $('#' + id); e.innerHTML = '<span class="bit">0</span>'.repeat(8); };
+  bits('bitsAH'); bits('bitsAL');
+  const upd = (ah, al, from) => {
+    ah &= 255; al &= 255;
+    const paint = (id, v) => $$('#' + id + ' .bit').forEach((b, i) => { const bit = (v >> (7 - i)) & 1, old = b.classList.contains('on'); b.textContent = bit; b.classList.toggle('on', !!bit); if (old !== !!bit && !calm) { b.classList.remove('flip'); void b.offsetWidth; b.classList.add('flip'); } });
+    paint('bitsAH', ah); paint('bitsAL', al);
+    if (from !== 'ah') $('#inAH').value = ah.toString(16).toUpperCase().padStart(2, '0');
+    if (from !== 'al') $('#inAL').value = al.toString(16).toUpperCase().padStart(2, '0');
+    if (from !== 'ax') $('#inAX').value = ((ah << 8) | al).toString(16).toUpperCase().padStart(4, '0');
+    $('#axDec').textContent = 'thập phân: ' + ((ah << 8) | al);
+  };
+  const hx = s => { const v = parseInt(s, 16); return isNaN(v) ? 0 : v; };
+  $('#inAH').oninput = () => upd(hx($('#inAH').value), hx($('#inAL').value), 'ah');
+  $('#inAL').oninput = () => upd(hx($('#inAH').value), hx($('#inAL').value), 'al');
+  $('#inAX').oninput = () => { const v = hx($('#inAX').value) & 0xFFFF; upd(v >> 8, v & 255, 'ax'); };
+  $('#axInc').onclick = () => upd(hx($('#inAH').value), (hx($('#inAL').value) + 1) & 255);
+  $('#axShl').onclick = () => upd(hx($('#inAH').value), (hx($('#inAL').value) << 1) & 255);
+  $('#axNot').onclick = () => upd(hx($('#inAH').value), ~hx($('#inAL').value) & 255);
+  upd(0x12, 0x34);
+}
+
+/* =====================================================================
+   6. TAB BIÊN DỊCH
+   ===================================================================== */
+const comp = {size:8, init:{}, last:null};
+const EXAMPLES = ['a = b + c', 'a = b - c', 'a = b * c', 'a = b / c', 'a = b % c', 'x = (a + b) * c', 'a = 2 * b + 3', 'a++', 'a += b', 'a = -b'];
+function doCompile(auto = true) {
+  const src = $('#cSrc').value, r = compile(src, comp.size, comp.init), er = $('#cErr');
+  comp.last = r;
+  if (r.errors.length) {
+    er.hidden = false; er.innerHTML = `<b>Chưa biên dịch được:</b><ul>${r.errors.map(x => `<li>${x}</li>`).join('')}</ul>`;
+    $('#cOut').innerHTML = '<p class="small">Hãy sửa lỗi ở trên.</p>'; $('#cResult').innerHTML = ''; return;
+  }
+  er.hidden = true;
+  $('#cVars').innerHTML = r.names.map(n => `<label>${n} = <input type="number" data-n="${n}" value="${r.init[n.toLowerCase()]}" min="${comp.size === 8 ? 0 : 0}" max="${comp.size === 8 ? 255 : 65535}"></label>`).join('');
+  $$('#cVars input').forEach(i => i.onchange = () => { let v = parseInt(i.value, 10); if (isNaN(v)) v = 0; comp.init[i.dataset.n.toLowerCase()] = v; doCompile(); });
+  $('#cOut').innerHTML = `<div class="small" style="margin-bottom:6px">Dữ liệu: ${r.names.map(n => `<code style="margin-right:14px">${n} ${comp.size === 8 ? 'DB' : 'DW'} ${r.init[n.toLowerCase()]}</code>`).join('')}</div>` +
+    r.stmts.map(s => `<div class="stmt"><div class="stmt-h">${s.src}</div><div class="stmt-b">${s.lines.map(l => `<div class="cl"><span class="cc">${l.c}</span><span class="cm">${l.cm}</span></div>`).join('')}</div></div>`).join('') +
+    `<div class="stmt"><div class="stmt-h" style="background:var(--card2)">kết thúc</div><div class="stmt-b"><div class="cl"><span class="cc">HLT</span><span class="cm">dừng CPU</span></div></div></div>`;
+  $('#cResult').innerHTML = '';
+  if (auto) loadRunner(r.asm, 'Mã vừa biên dịch');
+}
+function compileResult() {
+  const r = comp.last; if (!r || r.errors.length) return;
+  loadRunner(r.asm, 'Mã vừa biên dịch'); runEnd();
+  const st = curSt(), p = run.prog, sz = comp.size;
+  if (st.err) { $('#cResult').innerHTML = `<div class="errs">${st.err}</div>`; return; }
+  const rows = r.names.map(n => {
+    const v = st.vars[p.varIdx[n.toLowerCase()]].val, real = r.expected ? r.expected[n.toLowerCase()] : null;
+    const expectMasked = real === null ? null : real & MASK[sz];
+    let cls = 'ok', note = 'khớp';
+    if (real === null) { cls = ''; note = r.expErr || ''; }
+    else if (expectMasked !== v) { cls = 'bad'; note = 'khác: trình biên dịch dùng số không dấu'; }
+    else if (real < 0 || real > MASK[sz]) { cls = 'bad'; note = real > MASK[sz] ? `tràn! giá trị thật ${real} không vừa ${sz} bit nên bị cắt` : `âm! ${real} được lưu quay vòng (số không dấu)`; }
+    return `<tr><td class="m">${n}</td><td class="m">${real === null ? '—' : real}</td><td class="m">${v} (${hexN(v, sz)})</td><td class="${cls}">${note}</td></tr>`;
+  }).join('');
+  $('#cResult').innerHTML = `<table class="t res"><tr><th>Biến</th><th>Giá trị toán học</th><th>Giá trị trong máy</th><th>Nhận xét</th></tr>${rows}</table><p class="small">Máy chạy ${st.steps} lệnh. Thử đổi giá trị ban đầu của biến (ví dụ b = 200, c = 100) để thấy hiện tượng tràn số.</p>`;
+}
+function buildCompiler() {
+  $('#cEx').innerHTML = EXAMPLES.map(e => `<button class="chipbtn" type="button">${e}</button>`).join('');
+  $$('#cEx .chipbtn').forEach(b => b.onclick = () => { $('#cSrc').value = b.textContent; doCompile(); });
+  let tm; $('#cSrc').oninput = () => { clearTimeout(tm); tm = setTimeout(() => doCompile(), 250); };
+  $$('#cSize button').forEach(b => b.onclick = () => { comp.size = +b.dataset.s; $$('#cSize button').forEach(x => x.setAttribute('aria-pressed', x === b)); comp.init = {}; doCompile(); });
+  $('#cRun').onclick = compileResult;
+}
+
+/* =====================================================================
+   7. TAB BÀI TẬP (đáp án do chính máy ảo tính)
+   ===================================================================== */
+const Rn = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const hex2 = v => v.toString(16).toUpperCase().padStart(2, '0') + 'h';
+const lead = h => /^[A-F]/.test(h) ? '0' + h : h;
+const bin8 = v => v.toString(2).padStart(8, '0') + 'b';
+const TEMPLATES = [
+  {lv:1, gen:() => { const a = Rn(10, 99), b = Rn(10, 99 - 0); return {code:`MOV AL, ${a}\nADD AL, ${Math.min(b, 255 - a)}`, ask:{k:'reg', n:'AL'}, fmt:'dec', hint:'ADD cộng nguồn vào đích rồi để kết quả lại ở đích (AL).'}; }},
+  {lv:1, gen:() => { const a = Rn(30, 99), b = Rn(1, 29); return {code:`MOV AL, ${a}\nMOV BL, ${b}\nSUB AL, BL`, ask:{k:'reg', n:'AL'}, fmt:'dec', hint:'SUB trừ nguồn khỏi đích: AL = AL − BL. BL không đổi.'}; }},
+  {lv:1, gen:() => { const a = Rn(5, 60); return {code:`MOV AL, ${a}\nMOV BL, AL\nADD AL, BL`, ask:{k:'reg', n:'AL'}, fmt:'dec', hint:'MOV chép giá trị (AL không mất). Sau đó AL cộng với bản sao của chính nó.'}; }},
+  {lv:1, gen:() => { const w = ((Rn(1, 255) << 8) | Rn(1, 255)).toString(16).toUpperCase().padStart(4, '0'), tgt = pick(['AL', 'AH']); return {code:`MOV AX, ${/^[A-F]/.test(w) ? '0' : ''}${w}h`, ask:{k:'reg', n:tgt}, fmt:'hex', hint:'AX gồm hai nửa: AH là byte cao (hai chữ số hex đầu), AL là byte thấp (hai chữ số hex sau).'}; }},
+  {lv:1, gen:() => { const a = Rn(5, 40), i = Rn(1, 4), d = Rn(1, 3); return {code:`MOV CL, ${a}\n${'INC CL\n'.repeat(i)}${'DEC CL\n'.repeat(d)}`.trim(), ask:{k:'reg', n:'CL'}, fmt:'dec', hint:`Mỗi INC cộng 1, mỗi DEC trừ 1: ${a} + ${i} − ${d}.`}; }},
+  {lv:1, gen:() => { const a = Rn(10, 99); let b = Rn(10, 99); if (b === a) b++; return {code:`MOV AL, ${a}\nMOV BL, AL\nMOV AL, ${b}`, ask:{k:'reg', n:'BL'}, fmt:'dec', hint:'MOV BL, AL chép giá trị lúc đó của AL sang BL. Việc gán AL lại sau đó không ảnh hưởng tới BL.'}; }},
+  {lv:2, gen:() => { const d = Rn(0, 9); return {code:`MOV AL, ${hex2(0x30 + d)}\nAND AL, 0Fh`, ask:{k:'reg', n:'AL'}, fmt:'hex', hint:'AND với 0Fh giữ lại 4 bit thấp và xóa 4 bit cao (mặt nạ 0000 1111).'}; }},
+  {lv:2, gen:() => { const d = Rn(0, 9); return {code:`MOV DL, ${d}\nOR DL, 30h`, ask:{k:'reg', n:'DL'}, fmt:'hex', hint:'OR với 30h bật hai bit 4 và 5. Đây là cách đổi chữ số thành mã ASCII của ký tự số.'}; }},
+  {lv:2, gen:() => { const v = Rn(1, 254); return {code:`MOV AL, ${lead(hex2(v))}\nXOR AL, 0FFh`, ask:{k:'reg', n:'AL'}, fmt:'hex', hint:'XOR với 1 làm đảo bit; XOR với FFh đảo cả 8 bit (giống NOT).'}; }},
+  {lv:2, gen:() => { const v = Rn(1, 127), op = pick(['NOT', 'NEG']); return {code:`MOV AL, ${v}\n${op} AL`, ask:{k:'reg', n:'AL'}, fmt:'hex', hint: op === 'NOT' ? 'NOT đảo mọi bit, tương đương 255 − AL.' : 'NEG đổi dấu theo số bù 2: AL = 256 − AL (với AL khác 0).'}; }},
+  {lv:2, gen:() => { const a = Rn(5, 90), b = Rn(5, 90); return {code:`MOV AL, ${a}\nMOV BL, ${b}\nXCHG AL, BL\nSUB AL, BL`, ask:{k:'reg', n:'AL'}, fmt:'dec', hint:'Sau XCHG, AL giữ số của BL và BL giữ số của AL. Nếu hiệu âm thì kết quả quay vòng (cộng 256).'}; }},
+  {lv:2, gen:() => { const x = Rn(1, 255), m = pick([0xF0, 0x0F, 0x3C, 0xAA, 0x55]); return {code:`MOV AL, ${bin8(x)}\nAND AL, ${bin8(m)}`, ask:{k:'reg', n:'AL'}, fmt:'bin', hint:'AND từng cặp bit: kết quả là 1 chỉ khi cả hai bit đều là 1.'}; }},
+  {lv:3, gen:() => { const a = Rn(1, 15), n = Rn(1, 4); return {code:`MOV AL, ${a}\nSHL AL, ${n}`, ask:{k:'reg', n:'AL'}, fmt:'dec', hint:`Dịch trái ${n} bit = nhân với 2^${n} = ${2 ** n}.`}; }},
+  {lv:3, gen:() => { const a = Rn(50, 250), n = Rn(1, 4); return {code:`MOV AL, ${a}\nSHR AL, ${n}`, ask:{k:'reg', n:'AL'}, fmt:'dec', hint:`Dịch phải ${n} bit = chia nguyên cho ${2 ** n} (bỏ phần dư).`}; }},
+  {lv:3, gen:() => { const x = Rn(1, 254), n = Rn(1, 3), op = pick(['ROL', 'ROR']); return {code:`MOV AL, ${bin8(x)}\n${op} AL, ${n}`, ask:{k:'reg', n:'AL'}, fmt:'bin', hint:`${op === 'ROL' ? 'ROL quay trái' : 'ROR quay phải'}: các bit bị đẩy ra được đưa vòng sang đầu bên kia, không mất bit nào.`}; }},
+  {lv:3, gen:() => { const a = Rn(2, 15), b = Rn(2, 15); return {code:`MOV AL, ${a}\nMOV BL, ${b}\nMUL BL`, ask:{k:'reg', n:'AX'}, fmt:'dec', hint:'MUL BL tính AX = AL × BL (một toán hạng, toán hạng kia ngầm định là AL).'}; }},
+  {lv:3, gen:() => { const d = Rn(2, 9), N = Rn(20, 250), tgt = pick(['AL', 'AH']); return {code:`MOV AX, ${N}\nMOV BL, ${d}\nDIV BL`, ask:{k:'reg', n:tgt}, fmt:'dec', hint:`DIV BL chia AX cho BL: thương vào AL, số dư vào AH. Hỏi ${tgt === 'AL' ? 'thương' : 'số dư'}.`}; }},
+  {lv:4, gen:() => { const a = Rn(240, 255), b = Rn(20, 60), t = pick(['AL', 'CF']); return {code:`MOV AL, ${a}\nADD AL, ${b}`, ask:t === 'AL' ? {k:'reg', n:'AL'} : {k:'flag', n:'CF'}, fmt:'dec', hint:`AL chỉ chứa 0–255. Tổng ${a + b} vượt 255 nên lấy phần dư khi chia cho 256 và CF = 1.`}; }},
+  {lv:4, gen:() => { const a = Rn(1, 60), b = Rn(1, 60), t = pick(['CF', 'ZF']); return {code:`MOV AL, ${a}\nMOV BL, ${b}\nSUB AL, BL`, ask:{k:'flag', n:t}, fmt:'dec', hint:'CF = 1 khi phải “mượn” (AL nhỏ hơn BL). ZF = 1 khi kết quả bằng 0 (hai số bằng nhau).'}; }},
+  {lv:4, gen:() => { const n = Rn(2, 6), k = Rn(2, 9); return {code:`MOV AL, 0\nMOV CX, ${n}\nlap: ADD AL, ${k}\nLOOP lap`, ask:{k:'reg', n:'AL'}, fmt:'dec', hint:`Thân vòng lặp chạy ${n} lần (CX giảm từ ${n} về 0), mỗi lần cộng ${k}.`}; }},
+  {lv:4, gen:() => { const a = Rn(10, 200); let b = Rn(10, 200); const op = pick(['JA', 'JB']); return {code:`MOV AL, ${a}\nMOV BL, ${b}\nCMP AL, BL\n${op} nhay\nMOV DL, 0\nJMP xong\nnhay: MOV DL, 1\nxong: HLT`, ask:{k:'reg', n:'DL'}, fmt:'dec', hint:`CMP so sánh AL với BL (không dấu). ${op === 'JA' ? 'JA nhảy khi AL > BL' : 'JB nhảy khi AL < BL'}; nếu nhảy thì DL = 1, nếu không thì DL = 0.`}; }},
+  {lv:4, gen:() => { const n = Rn(1, 7); return {code:`MOV AL, 1\nMOV CX, ${n}\nlap: SHL AL, 1\nLOOP lap`, ask:{k:'reg', n:'AL'}, fmt:'dec', hint:`Mỗi vòng AL nhân đôi (dịch trái 1 bit), lặp ${n} lần: 2^${n}.`}; }},
+  {lv:4, gen:() => { const a = Rn(20, 90), b = Rn(5, 60), c = Rn(1, 30); return {code:`MOV AL, ${a}\nADD AL, ${b}\nMOV BL, AL\nSUB BL, ${c}`, ask:{k:'reg', n:'BL'}, fmt:'dec', hint:'Theo dõi từng thanh ghi: AL = a + b, BL chép AL, rồi trừ c. Hỏi BL.'}; }}
+];
+const ex = {lv:0, cur:null, solved:false, ok:0, n:0, streak:0, tries:0, num:0};
+function expectedOf(item) {
+  const p = assemble(item.code); if (p.errors.length) throw new Error(p.errors.join('; '));
+  const {st} = runAll(p);
+  if (st.err) throw new Error(st.err);
+  const a = item.ask; let size = 16, val;
+  if (a.k === 'reg') { val = gr(st, a.n); size = R8[a.n] ? 8 : 16; } else if (a.k === 'flag') { val = st.f[a.n]; size = 1; }
+  return {val, size, st, prog:p};
+}
+function newExercise() {
+  const pool = TEMPLATES.filter(t => ex.lv === 0 || t.lv === ex.lv);
+  let item, exp;
+  for (let i = 0; i < 20; i++) { const t = pick(pool); try { item = t.gen(); item.lv = t.lv; exp = expectedOf(item); break; } catch (e) { item = null; } }
+  ex.cur = item; ex.exp = exp; ex.solved = false; ex.tries = 0; ex.num++;
+  const a = item.ask;
+  $('#exMeta').textContent = `Bài ${ex.num} · Mức ${item.lv}`;
+  $('#exQ').textContent = a.k === 'flag' ? `Sau khi chạy đoạn code, cờ ${a.n} bằng bao nhiêu (0 hay 1)?` : `Sau khi chạy đoạn code, giá trị của ${a.n} là bao nhiêu?`;
+  $('#exCode').textContent = item.code;
+  $('#exLhs').textContent = a.n + ' =';
+  const f = a.k === 'flag' ? 'Trả lời 0 hoặc 1.' : item.fmt === 'hex' ? 'Trả lời dạng hex, ví dụ 3Fh.' : item.fmt === 'bin' ? 'Trả lời dạng nhị phân, ví dụ 10110010b.' : 'Trả lời bằng số thập phân.';
+  $('#exFmt').textContent = f + ' Máy chấp nhận mọi dạng: 63, 3Fh, 0x3F, 111111b.';
+  $('#exIn').value = ''; $('#exFb').hidden = true; $('#exSol').innerHTML = '';
+  $('#exCheck').disabled = false; $('#exIn').disabled = false;
+  loadRunner(item.code, `Bài tập ${ex.num} (đã khóa)`, {locked:true});
+  $('#exIn').focus();
+}
+function parseAnswer(s, size) {
+  s = s.trim(); if (!s) return null;
+  if (/^[-+]?\d+$/.test(s)) { const v = parseInt(s, 10); return size === 1 ? v : v & MASK[size]; }
+  const v = parseNum(s.replace(/^0X/i, '0x')); if (v !== null) return size === 1 ? v : v & MASK[size];
+  if (/^[0-9a-f]+$/i.test(s)) return parseInt(s, 16) & MASK[size];
+  return null;
+}
+function showSolution() {
+  const {st, prog} = ex.exp, tr = runAll(prog).trace, a = ex.cur.ask, size = ex.exp.size, v = ex.exp.val;
+  const finalTxt = size === 1 ? `${a.n} = ${v}` : `${a.n} = ${v} = ${hexN(v, size)} = ${binN(v, size)}`;
+  $('#exSol').innerHTML = `<h3 style="margin:12px 0 6px">Lời giải từng bước</h3><table class="t trace"><tr><th>#</th><th>Lệnh</th><th>Điều gì xảy ra</th></tr>${tr.map((t, i) => `<tr><td>${i + 1}</td><td class="ins">${t.ins.text}</td><td>${t.note}</td></tr>`).join('')}</table>
+    <div class="fbk info"><b>Đáp án: ${finalTxt}</b></div><p class="small">Máy ảo bên cạnh đã được mở: bấm “Bước” để tự xem lại từng dòng.</p>`;
+  run.locked = false; $('#rLock').hidden = true; $('#rEditBtn').hidden = true; $('#rSrc').textContent = `Bài tập ${ex.num}`; renderMachine();
+}
+function checkAnswer() {
+  if (ex.solved) return;
+  const size = ex.exp.size, got = parseAnswer($('#exIn').value, size), fb = $('#exFb');
+  if (got === null) { fb.hidden = false; fb.className = 'fbk bad'; fb.textContent = 'Chưa đọc được đáp án. Hãy nhập một số, ví dụ 42, 2Ah hoặc 101010b.'; return; }
+  ex.tries++;
+  if (got === ex.exp.val) {
+    ex.solved = true; ex.n++; ex.ok += ex.tries === 1 ? 1 : 0; ex.streak = ex.tries === 1 ? ex.streak + 1 : 0;
+    fb.hidden = false; fb.className = 'fbk ok'; fb.innerHTML = `<b>Chính xác!</b> ${ex.tries === 1 ? 'Đúng ngay lần đầu.' : `Đúng sau ${ex.tries} lần thử.`}`;
+    showSolution(); updScore(); $('#exCheck').disabled = true;
+  } else {
+    if (ex.tries === 1) { ex.n++; ex.streak = 0; updScore(); }
+    fb.hidden = false; fb.className = 'fbk bad';
+    fb.innerHTML = `<b>Chưa đúng.</b> Bạn nhập ${$('#exIn').value.trim()}. Hãy thử lại, bấm “Gợi ý”, hoặc xem lời giải.`;
+    $('#exIn').select();
+  }
+}
+const updScore = () => { $('#scOk').textContent = ex.ok; $('#scN').textContent = ex.n; $('#scStreak').textContent = ex.streak; };
+function buildExercises() {
+  $$('#lvls button').forEach(b => b.onclick = () => { ex.lv = +b.dataset.l; $$('#lvls button').forEach(x => x.setAttribute('aria-pressed', x === b)); newExercise(); });
+  $('#exNew').onclick = newExercise;
+  $('#exCheck').onclick = checkAnswer;
+  $('#exIn').onkeydown = e => { if (e.key === 'Enter') { if (ex.solved) newExercise(); else checkAnswer(); } };
+  $('#exHint').onclick = () => { const fb = $('#exFb'); fb.hidden = false; fb.className = 'fbk info'; fb.innerHTML = `💡 <b>Gợi ý:</b> ${ex.cur.hint}`; };
+  $('#exSolve').onclick = () => { if (ex.solved) return; if (ex.tries === 0) { ex.n++; ex.streak = 0; updScore(); } ex.solved = true; $('#exCheck').disabled = true; const fb = $('#exFb'); fb.hidden = true; showSolution(); };
+}
+
+/* =====================================================================
+   8. KHỞI TẠO
+   ===================================================================== */
+function showTab(id) {
+  $$('.tabbar button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === id));
+  $$('.tabpanel').forEach(p => p.hidden = p.id !== 'tab-' + id);
+  if (id === 'comp') { doCompile(); }
+  if (id === 'ex') { if (!ex.cur) newExercise(); else if (!ex.solved) loadRunner(ex.cur.code, `Bài tập ${ex.num} (đã khóa)`, {locked:true}); }
+  if (id === 'intro') { if (run.locked) loadRunner(GROUPS[0].rows[0].ex, 'Ví dụ: ' + GROUPS[0].rows[0].syn); }
+}
+function init() {
+  try { const t = localStorage.getItem('cpu-theme'); if (t) document.documentElement.dataset.theme = t; else if (matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.dataset.theme = 'dark'; } catch (e) {}
+  try { if (localStorage.getItem('cpu-calm') === '1') { calm = true; $('#motion').checked = false; document.documentElement.classList.add('calm'); } } catch (e) {}
+  buildRegs(); buildCatalog(); buildExplorer(); buildCompiler(); buildExercises();
+  $('#motion').onchange = e => { calm = !e.target.checked; document.documentElement.classList.toggle('calm', calm); try { localStorage.setItem('cpu-calm', calm ? '1' : '0'); } catch (x) {} };
+  $('#btnTheme').onclick = () => { const d = document.documentElement, n = d.dataset.theme === 'dark' ? 'light' : 'dark'; d.dataset.theme = n; try { localStorage.setItem('cpu-theme', n); } catch (e) {} };
+  $$('.tabbar button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+  $('#rStep').onclick = () => { stopAuto(); stepOnce(); };
+  $('#rBack').onclick = () => { stopAuto(); if (run.idx > 0) { run.idx--; renderMachine(); } };
+  $('#rReset').onclick = () => { stopAuto(); run.idx = 0; run.hist.length = 1; renderMachine(); };
+  $('#rAuto').onclick = () => { if (run.playing) { stopAuto(); renderMachine(); } else { run.playing = true; renderMachine(); autoTick(); } };
+  $('#rEnd').onclick = runEnd;
+  $('#rEditBtn').onclick = () => { $('#rEdit').hidden = !$('#rEdit').hidden; };
+  $('#rApply').onclick = () => { if (loadRunner($('#rTxt').value, 'Mã do bạn nhập')) { $('#rEdit').hidden = true; } };
+  loadRunner(GROUPS[0].rows[0].ex, 'Ví dụ: ' + GROUPS[0].rows[0].syn);
+  $('#cSrc').value = 'a = b + c';
+}
+// API nhỏ phục vụ kiểm thử
+window.__t = {assemble, runAll, compile, TEMPLATES, expectedOf, GROUPS, newState, exec};
+init();
+})();
+</script>
+</body>
+</html>
